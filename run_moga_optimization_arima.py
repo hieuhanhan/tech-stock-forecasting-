@@ -1,6 +1,9 @@
 import pandas as pd
 import json
 import os
+# --- THÊM VÀO: Tối ưu hóa cho chạy song song ---
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 import numpy as np
 from tqdm import tqdm
 
@@ -9,11 +12,10 @@ from statsmodels.tsa.arima.model import ARIMA
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
-# --- THÊM VÀO: Thư viện để chạy song song ---
 import multiprocessing as mp
 
 # ===================================================================
-# 1. CÁC HÀM HỖ TRỢ (Không thay đổi)
+# 1. CÁC HÀM HỖ TRỢ
 # ===================================================================
 def calculate_sharpe_ratio(daily_returns):
     if np.std(daily_returns) == 0: return 0.0
@@ -31,7 +33,7 @@ def create_final_moga_objective_arima(train_log_returns, actual_log_returns, tra
         p, q, action_threshold = int(params[0]), int(params[1]), params[2]
         try:
             model = ARIMA(train_log_returns, order=(p, 0, q))
-            model_fit = model.fit()
+            model_fit = model.fit(disp=0) 
             forecast = model_fit.forecast(steps=len(actual_log_returns)).values
             signals = (forecast > action_threshold).astype(int)
             net_returns = (actual_log_returns * signals) - (signals * transaction_cost)
@@ -50,35 +52,24 @@ class AdvancedARIMAProblem(ElementwiseProblem):
         out["F"] = self.objective_func(x)
 
 # ===================================================================
-# 2. HÀM TỐI ƯU HÓA CHO MỘT FOLD DUY NHẤT (Đã được sửa đổi)
+# 2. HÀM TỐI ƯU HÓA CHO MỘT FOLD DUY NHẤT
 # ===================================================================
 def optimize_single_fold(fold_id, folds_summary_map, folds_dir):
-    """
-    Hàm này chứa toàn bộ logic để xử lý một fold duy nhất.
-    Nó sẽ được gọi song song bởi nhiều tiến trình.
-    """
     fold_info = folds_summary_map.get(fold_id)
-    if not fold_info:
-        return None
-
+    if not fold_info: return None
     train_path = os.path.join(folds_dir, fold_info['train_path_arima_prophet'])
     val_path = os.path.join(folds_dir, fold_info['val_path_arima_prophet'])
-    
     try:
         train_df = pd.read_csv(train_path)
         val_df = pd.read_csv(val_path)
     except FileNotFoundError:
         return None
-
     train_log_returns = train_df['Log_Returns'].dropna()
     actual_returns = val_df['Log_Returns'].values
-
     moga_objective = create_final_moga_objective_arima(train_log_returns, actual_returns)
     problem = AdvancedARIMAProblem(moga_objective)
-    algorithm = NSGA2(pop_size=50)
-    
-    res = minimize(problem, algorithm, ('n_gen', 40), seed=42, verbose=False)
-
+    algorithm = NSGA2(pop_size=40)
+    res = minimize(problem, algorithm, ('n_gen', 30), seed=42, verbose=False)
     return {
         'fold_id': fold_id,
         'ticker': fold_info['ticker'],
@@ -89,12 +80,11 @@ def optimize_single_fold(fold_id, folds_summary_map, folds_dir):
     }
 
 # ===================================================================
-# 3. SCRIPT CHÍNH (Đã được sửa đổi để chạy song song)
+# 3. SCRIPT CHÍNH (Tối ưu hóa cuối cùng)
 # ===================================================================
 if __name__ == "__main__":
     print("Starting FINAL Multi-Objective Optimization (MOGA) for ARIMA in PARALLEL...")
 
-    # Tải các file cần thiết
     results_dir = 'data/tuning_results'
     folds_dir = 'data/processed_folds'
     folds_summary_path = os.path.join(folds_dir, 'folds_summary.json')
@@ -106,23 +96,20 @@ if __name__ == "__main__":
         representative_fold_ids = json.load(f)
     folds_summary_map = {item['global_fold_id']: item for item in all_folds_summary}
 
-    # --- THAY ĐỔI LỚN: SỬ DỤNG MULTIPROCESSING ---
-    # Lấy số lượng CPU có sẵn trên máy ảo
-    num_processes = mp.cpu_count()
-    print(f"Found {num_processes} CPU cores. Starting parallel processing...")
+    num_cpus = mp.cpu_count()
+    print(f"Found {num_cpus} CPU cores. Starting parallel processing...")
 
-    # Tạo một "pool" các tiến trình làm việc
-    with mp.Pool(processes=num_processes) as pool:
-        # Chuẩn bị các tham số cho mỗi tác vụ
-        tasks = [(fold_id, folds_summary_map, folds_dir) for fold_id in representative_fold_ids]
-        
-        # Phân phối các tác vụ cho các tiến trình và hiển thị thanh tiến trình
-        results = list(tqdm(pool.starmap(optimize_single_fold, tasks), total=len(tasks)))
+    tasks = [(fold_id, folds_summary_map, folds_dir) for fold_id in representative_fold_ids]
+    
+    final_moga_results = []
+    
+    # SỬA LỖI: Dùng pool.starmap là cách trực tiếp và đúng đắn nhất cho trường hợp này
+    with mp.Pool(processes=num_cpus) as pool:
+        # starmap sẽ tự động "giải nén" các tuple trong 'tasks' để truyền vào hàm
+        for result in tqdm(pool.starmap(optimize_single_fold, tasks), total=len(tasks)):
+            if result is not None:
+                final_moga_results.append(result)
 
-    # Lọc bỏ các kết quả None (nếu có lỗi xảy ra)
-    final_moga_results = [res for res in results if res is not None]
-
-    # --- Lưu kết quả cuối cùng ---
     print("\n--- FINAL MOGA Tuning Complete for ARIMA! ---")
     moga_results_path = os.path.join(results_dir, 'final_moga_arima_results.json')
     with open(moga_results_path, 'w') as f:
