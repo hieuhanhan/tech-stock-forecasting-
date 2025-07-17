@@ -171,7 +171,7 @@ class AdvancedLSTMProblem(ElementwiseProblem):
 # MAIN LOOP
 # -----------------------------------------------------------------------------
 def main():
-    logging.info("Starting MOGA LSTM tuning …")
+    logging.info("Starting MOGA LSTM tuning in SINGLE FOLD TEST MODE…")
 
     results_dir = 'data/tuning_results'
     folds_dir   = 'data/processed_folds'
@@ -184,16 +184,13 @@ def main():
     try:
         with open(moga_path, 'r') as f:
             all_results = json.load(f)
-        done_fold_ids = {r['fold_id'] for r in all_results}
+        done_fold_ids = {r['fold_id'] for r in all_results if r.get('status') == 'success'}
         logging.info(f"Resuming from {len(all_results)} completed folds")
-    except FileNotFoundError:
-        logging.info("No existing results file found. Starting fresh.")
-    except json.JSONDecodeError:
-        logging.warning(f"Could not read {moga_path}. Starting fresh.")
+    except (FileNotFoundError, json.JSONDecodeError):
+        logging.info("Starting fresh.")
         all_results = []
         done_fold_ids = set()
 
-    # load fold metadata
     summary = json.load(open(os.path.join(folds_dir, 'folds_summary.json')))
     reps = json.load(open(os.path.join(folds_dir, 'shared_meta', 'representative_fold_ids.json')))
     summary_map = {f['global_fold_id']: f for f in summary}
@@ -211,18 +208,17 @@ def main():
         start_time = time.time()
 
         try:
-            # read data
             train_df = pd.read_csv(os.path.join(folds_dir, summary_map[fid]['train_path_lstm_gru']), parse_dates=['Date'])
             val_df = pd.read_csv(os.path.join(folds_dir, summary_map[fid]['val_path_lstm_gru']), parse_dates=['Date'])
-
             train_log_returns = train_df['Log_Returns'].dropna()
             actual_returns = val_df['Log_Returns'].dropna().values
 
-            # build and run optimization
             moga_objective = create_final_moga_objective_lstm(train_log_returns, actual_returns)
             problem = AdvancedLSTMProblem(moga_objective)
             algorithm = NSGA2(pop_size=30)
-            res = minimize(problem, algorithm, ('n_gen', 20), seed=42, verbose=False)
+            
+            # <<< THAY ĐỔI 1: Bật verbose để xem log tiến trình >>>
+            res = minimize(problem, algorithm, ('n_gen', 20), seed=42, verbose=True)
 
             fold_solutions = []
             for sol, obj in zip(res.X, res.F):
@@ -241,18 +237,19 @@ def main():
 
         except Exception as e:
             logging.exception(f" Failed on fold {fid}: {e}")
-            
             fold_result['status'] = 'error'
             fold_result['error_message'] = str(e)
             
         finally:
-          
             fold_result['end_time'] = time.strftime('%Y-%m-%d %H:%M:%S')
             fold_result['duration_seconds'] = round(time.time() - start_time, 2)
-        
             all_results.append(fold_result)
-            
             with open(moga_path, 'w') as f:
                 json.dump(all_results, f, indent=4)
+            
+            # <<< THAY ĐỔI 2: Dừng lại sau khi xong fold đầu tiên >>>
+            logging.info(f"Test run for fold {fid} finished. Stopping.")
+            break
 
-    logging.info(f"All folds done. Results saved to {moga_path}")
+    logging.info(f"Single fold test complete. Results saved to {moga_path}")
+
