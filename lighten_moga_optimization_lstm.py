@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tqdm import tqdm
+import time  
 
 from tensorflow.keras import Input, Sequential, backend as K
 from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
@@ -38,7 +39,7 @@ DEFAULT_BATCH_SIZE = 32
 EARLY_STOPPING_PATIENCE = 3
 
 # ============================================================
-# HELPER FUNCTION 
+# HELPER FUNCTION
 # ============================================================
 def calculate_sharpe_ratio(daily_returns: np.ndarray) -> float:
     """ Calculates the annualized Sharpe Ratio. """
@@ -52,16 +53,11 @@ def calculate_max_drawdown(daily_returns):
         return 0.0
     cumulative_returns = np.exp(np.cumsum(daily_returns))
     running_max = np.maximum.accumulate(cumulative_returns)
-    # Add a small epsilon to avoid division by zero is running_max is ever exactly 0
     drawdown = (running_max - cumulative_returns) / (running_max + np.finfo(float).eps)
     return np.max(drawdown)
 
 def create_sequences(series: np.ndarray, lookback_window: int):
-    """
-    Creates sequences for LSTM input.
-    Input: data (numpy array or list), lookback_window (int)
-    Output: X (3D numpy array), y (1D numpy array)
-    """
+    """ Creates sequences for LSTM input. """
     X, y = [], []
     for i in range(len(series) - lookback_window):
         X.append(series[i: i + lookback_window])
@@ -71,7 +67,6 @@ def create_sequences(series: np.ndarray, lookback_window: int):
 # ============================================================
 # MODEL FACTORY
 # ============================================================
-
 def build_lstm_model(lookback_window: int, n_units: int, learning_rate: float) -> tf.keras.Model:
     """ Two-layer LSTM w/ dropout & BN """
     model = Sequential([
@@ -79,13 +74,11 @@ def build_lstm_model(lookback_window: int, n_units: int, learning_rate: float) -
         LSTM(n_units, activation='tanh', return_sequences=True),
         Dropout(0.2),
         BatchNormalization(),
-
         LSTM(n_units // 2, activation='tanh'),
         Dropout(0.2),
         BatchNormalization(),
         Dense(1, activation='linear')
-        ])
-
+    ])
     model.compile(optimizer=Adam(learning_rate), loss='mse')
     return model
 
@@ -93,32 +86,25 @@ def build_lstm_model(lookback_window: int, n_units: int, learning_rate: float) -
 # OBJECTIVE FACTORY
 # -----------------------------------------------------------------------------
 def create_final_moga_objective_lstm(train_log_returns: pd.Series, actual_log_returns: np.ndarray, transaction_cost: float = 0.0005):
-    train_array = train_log_returns.values 
+    train_array = train_log_returns.values
     val_array = actual_log_returns
 
     def moga_objective_function(params):
-        # Hyperparameters to optimize: lookback_window, n_units, learning_rate, epochs, action_threshold
         lookback_window = int(params[0])
         n_units = int(params[1])
         learning_rate = float(params[2])
         epochs = int(params[3])
         action_threshold = float(params[4])
 
-        # Basic validation for lookback window
-        # Ensure training data is long enough to create at least one sequence
         if lookback_window < 1 or len(train_array) <= lookback_window or val_array.size == 0:
             return 1e9, 1e9
         
-        # prepare training sequences
         X_train, y_train = create_sequences(train_array.reshape(-1, 1), lookback_window)
         if X_train.size == 0:
             return 1e9, 1e9
         
-        # Reset graph & build model
         K.clear_session()
         model = build_lstm_model(lookback_window, n_units, learning_rate)
-
-        # Early stopping on training loss
         es = EarlyStopping(monitor='loss', patience=EARLY_STOPPING_PATIENCE, verbose=0, restore_best_weights=True)
 
         try:
@@ -134,7 +120,6 @@ def create_final_moga_objective_lstm(train_log_returns: pd.Series, actual_log_re
             logging.warning(f"Training failed (params={params}): {e}")
             return 1e9, 1e9
 
-        # prepare prediction sequences (use end of train + whole val)
         seq = np.concatenate([train_array[-lookback_window:], val_array])
         X_pred, _ = create_sequences(seq.reshape(-1, 1), lookback_window)
         if X_pred.size == 0:
@@ -158,10 +143,11 @@ def create_final_moga_objective_lstm(train_log_returns: pd.Series, actual_log_re
 class AdvancedLSTMProblem(ElementwiseProblem):
     def __init__(self, objective_func):
         super().__init__(
-        n_var=5,
-        n_obj=2,
-        xl = np.array([10, 32, 1e-4, 10, 0.0001]),
-        xu = np.array([60, 128, 1e-3, 50, 0.005]))
+            n_var=5,
+            n_obj=2,
+            xl=np.array([10, 32, 1e-4, 10, 0.0001]),
+            xu=np.array([60, 128, 1e-3, 50, 0.005])
+        )
         self.objective_func = objective_func
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -171,10 +157,10 @@ class AdvancedLSTMProblem(ElementwiseProblem):
 # MAIN LOOP
 # -----------------------------------------------------------------------------
 def main():
-    logging.info("Starting MOGA LSTM tuning in SINGLE FOLD TEST MODE…")
+    logging.info("Starting MOGA LSTM tuning …")
 
     results_dir = 'data/tuning_results'
-    folds_dir   = 'data/processed_folds'
+    folds_dir = 'data/processed_folds'
     os.makedirs(results_dir, exist_ok=True)
 
     moga_path = os.path.join(results_dir, 'final_moga_lstm_results.json')
@@ -184,7 +170,8 @@ def main():
     try:
         with open(moga_path, 'r') as f:
             all_results = json.load(f)
-        done_fold_ids = {r['fold_id'] for r in all_results if r.get('status') == 'success'}
+        # Sửa lại để đảm bảo resume đúng cách, bỏ qua cả 'error' và 'success'
+        done_fold_ids = {r['fold_id'] for r in all_results if r.get('status') in ['success', 'error']}
         logging.info(f"Resuming from {len(all_results)} completed folds")
     except (FileNotFoundError, json.JSONDecodeError):
         logging.info("Starting fresh.")
@@ -196,7 +183,7 @@ def main():
     summary_map = {f['global_fold_id']: f for f in summary}
 
     for fid in tqdm(reps, desc="folds"):
-        if fid in done_fold_ids: 
+        if fid in done_fold_ids:
             continue
         
         fold_result = {
@@ -216,9 +203,7 @@ def main():
             moga_objective = create_final_moga_objective_lstm(train_log_returns, actual_returns)
             problem = AdvancedLSTMProblem(moga_objective)
             algorithm = NSGA2(pop_size=30)
-            
-            # <<< THAY ĐỔI 1: Bật verbose để xem log tiến trình >>>
-            res = minimize(problem, algorithm, ('n_gen', 20), seed=42, verbose=True)
+            res = minimize(problem, algorithm, ('n_gen', 20), seed=42, verbose=False) # Đặt verbose=False cho lần chạy thật
 
             fold_solutions = []
             for sol, obj in zip(res.X, res.F):
@@ -236,7 +221,7 @@ def main():
             fold_result['status'] = 'success'
 
         except Exception as e:
-            logging.exception(f" Failed on fold {fid}: {e}")
+            logging.exception(f"❌ Failed on fold {fid}: {e}")
             fold_result['status'] = 'error'
             fold_result['error_message'] = str(e)
             
@@ -246,10 +231,8 @@ def main():
             all_results.append(fold_result)
             with open(moga_path, 'w') as f:
                 json.dump(all_results, f, indent=4)
-            
-            # <<< THAY ĐỔI 2: Dừng lại sau khi xong fold đầu tiên >>>
-            logging.info(f"Test run for fold {fid} finished. Stopping.")
-            break
+        break
+    logging.info(f"All folds done. Results saved to {moga_path}")
 
-    logging.info(f"Single fold test complete. Results saved to {moga_path}")
-
+if __name__ == "__main__":
+    main()
