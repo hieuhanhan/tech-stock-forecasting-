@@ -86,7 +86,7 @@ def build_lstm_model(lookback_window: int, n_units: int, learning_rate: float) -
 # OBJECTIVE FACTORY
 # -----------------------------------------------------------------------------
 def create_final_moga_objective_lstm(train_log_returns: pd.Series, actual_log_returns: np.ndarray, transaction_cost: float = 0.0005):
-    train_array = train_log_returns.values
+    train_array = train_log_returns.values.reshape(-1, 1)
     val_array = actual_log_returns
 
     def moga_objective_function(params):
@@ -99,33 +99,48 @@ def create_final_moga_objective_lstm(train_log_returns: pd.Series, actual_log_re
         if lookback_window < 1 or len(train_array) <= lookback_window or val_array.size == 0:
             return 1e9, 1e9
         
-        X_train, y_train = create_sequences(train_array.reshape(-1, 1), lookback_window)
-        if X_train.size == 0:
-            return 1e9, 1e9
+        train_data = tf.keras.utils.timeseries_dataset_from_array(
+            data=train_array,
+            targets=train_array[lookback_window:],
+            sequence_length=lookback_window,
+            batch_size=DEFAULT_BATCH_SIZE,
+            shuffle=False 
+        )
+        train_data = train_data.cache().prefetch(buffer_size=tf.data.AUTOTUNE)
         
         K.clear_session()
         model = build_lstm_model(lookback_window, n_units, learning_rate)
         es = EarlyStopping(monitor='loss', patience=EARLY_STOPPING_PATIENCE, verbose=0, restore_best_weights=True)
-
+        
         try:
             model.fit(
-                X_train, y_train,
-                epochs=epochs,
-                batch_size=DEFAULT_BATCH_SIZE,
-                verbose=0,
-                shuffle=False,
-                callbacks=[es]
+            train_data,
+            epochs=epochs,
+            verbose=0,
+            callbacks=[es]
             )
+
         except Exception as e:
             logging.warning(f"Training failed (params={params}): {e}")
             return 1e9, 1e9
 
-        seq = np.concatenate([train_array[-lookback_window:], val_array])
-        X_pred, _ = create_sequences(seq.reshape(-1, 1), lookback_window)
-        if X_pred.size == 0:
+        seq_for_pred = np.concatenate([train_array[-lookback_window:], val_array.reshape(-1, 1)])
+        if len(seq_for_pred) < lookback_window:
             return 1e9, 1e9
+        
+        pred_data = tf.keras.utils.timeseries_dataset_from_array(
+            data=seq_for_pred,
+            targets=None, 
+            sequence_length=lookback_window,
+            batch_size=DEFAULT_BATCH_SIZE,
+            shuffle=False
+        )
 
-        forecast = model.predict(X_pred, verbose=0).ravel()
+        forecast = model.predict(pred_data, verbose=0).ravel()
+
+        if len(forecast) > len(val_array):
+            forecast = forecast[:len(val_array)]
+
         signals = (forecast > action_threshold).astype(int)
         if signals.sum() == 0:
             return 1e9, 1e9
@@ -170,7 +185,6 @@ def main():
     try:
         with open(moga_path, 'r') as f:
             all_results = json.load(f)
-        # Sửa lại để đảm bảo resume đúng cách, bỏ qua cả 'error' và 'success'
         done_fold_ids = {r['fold_id'] for r in all_results if r.get('status') in ['success', 'error']}
         logging.info(f"Resuming from {len(all_results)} completed folds")
     except (FileNotFoundError, json.JSONDecodeError):
@@ -202,7 +216,7 @@ def main():
 
             moga_objective = create_final_moga_objective_lstm(train_log_returns, actual_returns)
             problem = AdvancedLSTMProblem(moga_objective)
-            algorithm = NSGA2(pop_size=30)
+            algorithm = NSGA2(pop_size=20)
             res = minimize(problem, algorithm, ('n_gen', 20), seed=42, verbose=False) # Đặt verbose=False cho lần chạy thật
 
             fold_solutions = []
