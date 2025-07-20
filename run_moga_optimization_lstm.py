@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tqdm import tqdm
-import time  # <<< SỬA LỖI 1: THÊM DÒNG NÀY
+import time  
 
 from tensorflow.keras import Input, Sequential, backend as K
 from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
@@ -221,7 +221,7 @@ def main():
             fold_result['status'] = 'success'
 
         except Exception as e:
-            logging.exception(f"❌ Failed on fold {fid}: {e}")
+            logging.exception(f" Failed on fold {fid}: {e}")
             fold_result['status'] = 'error'
             fold_result['error_message'] = str(e)
             

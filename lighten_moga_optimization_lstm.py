@@ -221,7 +221,7 @@ def main():
             fold_result['status'] = 'success'
 
         except Exception as e:
-            logging.exception(f"❌ Failed on fold {fid}: {e}")
+            logging.exception(f" Failed on fold {fid}: {e}")
             fold_result['status'] = 'error'
             fold_result['error_message'] = str(e)
             
