@@ -1,15 +1,17 @@
 import os
-import sys
 import json
 import logging
+import time
+import datetime
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tqdm import tqdm
-import time  
+from numpy.lib.stride_tricks import sliding_window_view 
 
-from tensorflow.keras import Input, Sequential, backend as K
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
+from tensorflow.keras import Sequential, backend as K
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 
@@ -17,236 +19,249 @@ from pymoo.core.problem import ElementwiseProblem
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 
-# ============================================================
-# CONFIG & LOGGING
-# ============================================================
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-# Limit TensorFlow verbosity, enable GPU growth
+# ---------------------- CONFIG & LOGGING ----------------------
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s %(levelname)s %(message)s")
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
-    logging.info(f"Using GPU(s): {gpus}")
+    logging.info(f"GPUs: {gpus}")
 else:
-    logging.info("No GPU found, using CPU only.")
+    logging.info("Using CPU")
 
-# -----------------------------------------------------------------------------
-# CONSTANTS (avoid magic numbers)
-# -----------------------------------------------------------------------------
+# ------------------------ CONSTANTS ---------------------------
 TRADING_DAYS = 252
-DEFAULT_BATCH_SIZE = 32
-EARLY_STOPPING_PATIENCE = 3
+BATCH_SIZE = 32
+PATIENCE = 3
 
-# ============================================================
-# HELPER FUNCTION
-# ============================================================
-def calculate_sharpe_ratio(daily_returns: np.ndarray) -> float:
-    """ Calculates the annualized Sharpe Ratio. """
-    if np.std(daily_returns) == 0:
+# ----------------------- METRICS ------------------------------
+def sharpe_ratio(returns):
+    if np.std(returns) == 0:
         return 0.0
-    return (np.mean(daily_returns) / np.std(daily_returns)) * np.sqrt(TRADING_DAYS)
+    return (np.mean(returns) / np.std(returns)) * np.sqrt(TRADING_DAYS)
 
-def calculate_max_drawdown(daily_returns):
-    """ Calculates the maximum drawdown. """
-    if len(daily_returns) == 0:
+def max_drawdown(returns):
+    if len(returns) == 0:
         return 0.0
-    cumulative_returns = np.exp(np.cumsum(daily_returns))
-    running_max = np.maximum.accumulate(cumulative_returns)
-    drawdown = (running_max - cumulative_returns) / (running_max + np.finfo(float).eps)
-    return np.max(drawdown)
+    cum = np.exp(np.cumsum(returns))
+    peak = np.maximum.accumulate(cum)
+    dd = (peak - cum) / (peak + np.finfo(float).eps)
+    return np.max(dd)
 
-def create_sequences(series: np.ndarray, lookback_window: int):
-    """ Creates sequences for LSTM input. """
-    X, y = [], []
-    for i in range(len(series) - lookback_window):
-        X.append(series[i: i + lookback_window])
-        y.append(series[i + lookback_window])
-    return np.array(X), np.array(y)
-
-# ============================================================
-# MODEL FACTORY
-# ============================================================
-def build_lstm_model(lookback_window: int, n_units: int, learning_rate: float) -> tf.keras.Model:
-    """ Two-layer LSTM w/ dropout & BN """
+# --------------------- MODEL CREATION -------------------------
+def make_lstm(lookback_window, n_features, n_units, learning_rate):
     model = Sequential([
-        Input(shape=(lookback_window, 1)),
-        LSTM(n_units, activation='tanh', return_sequences=True),
-        Dropout(0.2),
+        Input((lookback_window, n_features)),
+        LSTM(n_units, return_sequences=True),
         BatchNormalization(),
-        LSTM(n_units // 2, activation='tanh'),
         Dropout(0.2),
+
+        LSTM(n_units//2),
         BatchNormalization(),
-        Dense(1, activation='linear')
+        Dropout(0.2),
+        Dense(1)
     ])
-    model.compile(optimizer=Adam(learning_rate), loss='mse')
+    model.compile(Adam(learning_rate), 'mse')
     return model
 
-# -----------------------------------------------------------------------------
-# OBJECTIVE FACTORY
-# -----------------------------------------------------------------------------
-def create_final_moga_objective_lstm(train_log_returns: pd.Series, actual_log_returns: np.ndarray, transaction_cost: float = 0.0005):
-    train_array = train_log_returns.values.reshape(-1, 1)
-    val_array = actual_log_returns
+# --------------------- OBJECTIVE SETUP ------------------------
+def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.0005):
+    """
+    This function is called only once per fold. Its job is to set up the data and return
+    the actual function that the optimizer will use.
+    """
+    train_X = train_df[features].values
+    train_y = train_df[target].values
+    val_X = val_df[features].values
+    val_y = val_df[target].values
+    n_features = train_X.shape[1]
 
-    def moga_objective_function(params):
-        lookback_window = int(params[0])
+    # --- Inner helper for input generation ---
+    def create_windows(train_X, train_y, lookback_window, use_sliding_view=True, debug=False):
+        if len(train_X) <= lookback_window:
+            raise ValueError("Training data is too short for the specified lookback window.")
+
+        if use_sliding_view:
+            try:
+                windows = sliding_window_view(train_X, lookback_window, axis=0)
+                windows = windows[:-1]  
+            except Exception as e:
+                if debug:
+                    print(f"sliding_window_view failed: {e}")
+                raise
+        else:
+            windows = np.stack([
+                train_X[i:i + lookback_window] for i in range(len(train_X) - lookback_window)
+            ])
+
+        targets = train_y[lookback_window:]
+        assert windows.shape[0] == targets.shape[0], (
+            f"Shape mismatch: windows={windows.shape}, targets={targets.shape}"
+        )
+        return windows, targets
+    
+    def objective_function(params):
+        """
+        This is the core function return by create_objective. The optimizer call this
+        function hundreds or thousands of times. It has access to the variables defined 
+        in its parent function (train_X, train_y, n_features, etc.)
+        """
+        lookback_window = int(params[0])    
         n_units = int(params[1])
         learning_rate = float(params[2])
         epochs = int(params[3])
-        action_threshold = float(params[4])
+        relative_threshold = float(params[4])
 
-        if lookback_window < 1 or len(train_array) <= lookback_window or val_array.size == 0:
-            return 1e9, 1e9
+        logging.info(f"Trying params: lookback={lookback_window}, units={n_units}, "
+                 f"lr={learning_rate:.5f}, epochs={epochs}, threshold={relative_threshold:.4f}")
+
+        try:
+            windows, targets = create_windows(train_X, train_y, lookback_window,
+                                              use_sliding_view=False,  
+                                              debug=True)
+        except Exception as e:
+            logging.error(f"Failed to create windows for lookback={lookback_window}: {e}")
+            return 1e3, 1e3
+
+        if windows.shape[0] < 2:
+            logging.warning("Too few windows after slicing. Skipping.")
+            return 1e3, 1e3
         
-        train_data = tf.keras.utils.timeseries_dataset_from_array(
-            data=train_array,
-            targets=train_array[lookback_window:],
-            sequence_length=lookback_window,
-            batch_size=DEFAULT_BATCH_SIZE,
-            shuffle=False 
-        )
-        train_data = train_data.cache().prefetch(buffer_size=tf.data.AUTOTUNE)
-        
+        split = int(0.9 * len(windows))
+        X_train, X_valsplit = windows[:split], windows[split:]
+        y_train, y_valsplit = targets[:split], targets[split:]
+
+        logging.info(f"Train samples: {X_train.shape[0]}, Val samples: {X_valsplit.shape[0]}")
+
+        ds_train = tf.data.Dataset.from_tensor_slices((X_train, y_train))
+        ds_train = ds_train.batch(BATCH_SIZE).cache().prefetch(tf.data.AUTOTUNE)
+        ds_val = tf.data.Dataset.from_tensor_slices((X_valsplit, y_valsplit))
+        ds_val = ds_val.batch(BATCH_SIZE).cache().prefetch(tf.data.AUTOTUNE)
+
         K.clear_session()
-        model = build_lstm_model(lookback_window, n_units, learning_rate)
-        es = EarlyStopping(monitor='loss', patience=EARLY_STOPPING_PATIENCE, verbose=0, restore_best_weights=True)
-        
+        model = make_lstm(lookback_window, n_features, n_units, learning_rate)
+        es = EarlyStopping('val_loss', PATIENCE, True, verbose=0)
+
         try:
-            model.fit(
-            train_data,
-            epochs=epochs,
-            verbose=0,
-            callbacks=[es]
-            )
-
+            logging.info(f"Fitting model on {X_train.shape[0]} samples")
+            model.fit(ds_train, validation_data=ds_val, epochs=epochs, callbacks=[es], verbose=0)
+            val_loss = model.evaluate(ds_val, verbose=0)
+            logging.info(f"Final val_loss: {val_loss:.6f}")
         except Exception as e:
-            logging.warning(f"Training failed (params={params}): {e}")
-            return 1e9, 1e9
-
-        seq_for_pred = np.concatenate([train_array[-lookback_window:], val_array.reshape(-1, 1)])
-        if len(seq_for_pred) < lookback_window:
-            return 1e9, 1e9
+            logging.error(f"Model fitting failed for params {params}: {e}")
         
-        pred_data = tf.keras.utils.timeseries_dataset_from_array(
-            data=seq_for_pred,
-            targets=None, 
-            sequence_length=lookback_window,
-            batch_size=DEFAULT_BATCH_SIZE,
-            shuffle=False
-        )
+        # walk-forward prediction and evaluation
+        buf = list(train_X[-lookback_window:])
+        preds = []
 
-        forecast = model.predict(pred_data, verbose=0).ravel()
+        for i in range(len(val_y)):
+            inp = np.array(buf[-lookback_window:]).reshape(1, lookback_window, n_features)
+            p = model.predict(inp, verbose=0)[0,0]
+            preds.append(p)
+            buf.append(val_X[i])
 
-        if len(forecast) > len(val_array):
-            forecast = forecast[:len(val_array)]
+        preds = np.array(preds)
+        # ==== NEW RELATIVE THRESHOLDING LOGIC ====
+        min_pred, max_pred = preds.min(), preds.max()
+        if max_pred - min_pred < 1e-8:
+            logging.warning("Preds nearly constant. Skipping.")
+            return 1e3, 1e3
+        
+        dynamic_threshold = min_pred + (max_pred - min_pred) * relative_threshold
+        signals = (preds > dynamic_threshold).astype(int)
 
-        signals = (forecast > action_threshold).astype(int)
+        logging.info(f"Sample preds: {preds[:5]}")
+        logging.info(f"Dynamic threshold: {dynamic_threshold:.6f}")
+        logging.info(f"Signals distribution: {np.unique(signals, return_counts=True)}")
+
         if signals.sum() == 0:
-            return 1e9, 1e9
-
-        net_returns = val_array * signals - signals * transaction_cost
-        sharpe_ratio = calculate_sharpe_ratio(net_returns)
-        max_drawdown = calculate_max_drawdown(net_returns)
-        return -sharpe_ratio, max_drawdown
-
-    return moga_objective_function
-
-# -----------------------------------------------------------------------------
-# PYMOO WRAPPER
-# -----------------------------------------------------------------------------
-class AdvancedLSTMProblem(ElementwiseProblem):
-    def __init__(self, objective_func):
-        super().__init__(
-            n_var=5,
-            n_obj=2,
-            xl=np.array([10, 32, 1e-4, 10, 0.0001]),
-            xu=np.array([60, 128, 1e-3, 50, 0.005])
-        )
-        self.objective_func = objective_func
-
-    def _evaluate(self, x, out, *args, **kwargs):
-        out["F"] = self.objective_func(x)
-
-# -----------------------------------------------------------------------------
-# MAIN LOOP
-# -----------------------------------------------------------------------------
-def main():
-    logging.info("Starting MOGA LSTM tuning …")
-
-    results_dir = 'data/tuning_results'
-    folds_dir = 'data/processed_folds'
-    os.makedirs(results_dir, exist_ok=True)
-
-    moga_path = os.path.join(results_dir, 'final_moga_lstm_results.json')
-
-    all_results = []
-    done_fold_ids = set()
-    try:
-        with open(moga_path, 'r') as f:
-            all_results = json.load(f)
-        done_fold_ids = {r['fold_id'] for r in all_results if r.get('status') in ['success', 'error']}
-        logging.info(f"Resuming from {len(all_results)} completed folds")
-    except (FileNotFoundError, json.JSONDecodeError):
-        logging.info("Starting fresh.")
-        all_results = []
-        done_fold_ids = set()
-
-    summary = json.load(open(os.path.join(folds_dir, 'folds_summary.json')))
-    reps = json.load(open(os.path.join(folds_dir, 'shared_meta', 'representative_fold_ids.json')))
-    summary_map = {f['global_fold_id']: f for f in summary}
-
-    for fid in tqdm(reps, desc="folds"):
-        if fid in done_fold_ids:
-            continue
+            logging.warning("All signals are zero, skipping.")
+            return 1e3, 1e3
         
-        fold_result = {
-            'fold_id': fid,
-            'ticker': summary_map[fid]['ticker'],
-            'start_time': time.strftime('%Y-%m-%d %H:%M:%S'),
-            'status': 'running'
-        }
-        start_time = time.time()
+        returns = val_y * signals - signals * cost
+        logging.info(f"Returns: mean={np.mean(returns):.6f}, std={np.std(returns):.6f}")
+
+        sharpe = sharpe_ratio(returns)
+        mdd = max_drawdown(returns)
+        logging.info(f"Sharpe: {sharpe:.4f}, Max Drawdown: {mdd:.4f}")
+
+        return -sharpe, mdd
+
+    return objective_function
+
+# ---------------------- PYMOO PROBLEM ------------------------
+class LSTMProblem(ElementwiseProblem):
+    def __init__(self, obj_func):
+        super().__init__(n_var=5, n_obj=2,
+                         xl=np.array([10, 32, 1e-4, 10, 0.0]),
+                         xu=np.array([50, 64, 1e-3, 50, 1.0]))
+        self.obj = obj_func
+    def _evaluate(self, x, out, *args, **kwargs):
+        out['F'] = self.obj(x)
+
+# ------------------------ MAIN LOOP --------------------------
+def main():
+    logging.info("MOGA LSTM tuning start")
+    out_dir = 'data/tuning_results'
+    fold_dir = 'data/processed_folds'
+    os.makedirs(out_dir, exist_ok=True)
+    res_file = os.path.join(out_dir, 'results.json')
+
+    try:
+        res_list = json.load(open(res_file))
+        done = {r['fold_id'] for r in res_list if r['status'] in ['success','error']}
+    except:
+        res_list, done = [], set()
+
+    summary = json.load(open(os.path.join(fold_dir,'folds_summary.json')))
+    reps = json.load(open(os.path.join(fold_dir,'shared_meta','representative_fold_ids.json')))
+    smap = {f['global_fold_id']:f for f in summary}
+
+    for fid in tqdm(reps[3:]):
+        if fid in done:
+            logging.info(f"Skipping fold {fid} (already done)")
+            continue
+
+        logging.info(f"Running fold {fid} ...")
+        start = time.time()
 
         try:
-            train_df = pd.read_csv(os.path.join(folds_dir, summary_map[fid]['train_path_lstm_gru']), parse_dates=['Date'])
-            val_df = pd.read_csv(os.path.join(folds_dir, summary_map[fid]['val_path_lstm_gru']), parse_dates=['Date'])
-            train_log_returns = train_df['Log_Returns'].dropna()
-            actual_returns = val_df['Log_Returns'].dropna().values
+            train = pd.read_csv(os.path.join(fold_dir, smap[fid]['train_path_lstm_gru']))
+            val   = pd.read_csv(os.path.join(fold_dir, smap[fid]['val_path_lstm_gru']))
+            feats = [c for c in train.columns if c not in ['Date','Ticker','Log_Returns','target']]
 
-            moga_objective = create_final_moga_objective_lstm(train_log_returns, actual_returns)
-            problem = AdvancedLSTMProblem(moga_objective)
-            algorithm = NSGA2(pop_size=30)
-            res = minimize(problem, algorithm, ('n_gen', 20), seed=42, verbose=False) 
+            obj = create_objective(train, val, feats)
+            prob = LSTMProblem(obj)
+            alg  = NSGA2(pop_size=20)
 
-            fold_solutions = []
-            for sol, obj in zip(res.X, res.F):
-                fold_solutions.append({
-                    'lookback_window': int(sol[0]),
-                    'n_units': int(sol[1]),
-                    'learning_rate': float(sol[2]),
-                    'epochs': int(sol[3]),
-                    'action_threshold': float(sol[4]),
-                    'sharpe_ratio': -float(obj[0]),
-                    'max_drawdown': float(obj[1])
-                })
-
-            fold_result['pareto_front'] = fold_solutions
-            fold_result['status'] = 'success'
+            res  = minimize(prob, alg, ('n_gen',15), seed=42, verbose=False)
+            solutions = []
+            for x,f in zip(res.X,res.F):
+                solutions.append({
+                    'lookback_window':int(x[0]),
+                    'n_units':int(x[1]),
+                    'learning_rate':x[2],
+                    'epochs':int(x[3]),
+                    'action_threshold':x[4],
+                    'sharpe':-f[0],
+                    'max_drawdown':f[1]
+                    })
+            res_list.append({'fold_id':fid,'solutions':solutions,'status':'success'})
+            json.dump(res_list, open(res_file,'w'), indent=4)
+            logging.info(f"Completed fold {fid} with {len(solutions)} solutions")
 
         except Exception as e:
-            logging.exception(f" Failed on fold {fid}: {e}")
-            fold_result['status'] = 'error'
-            fold_result['error_message'] = str(e)
-            
-        finally:
-            fold_result['end_time'] = time.strftime('%Y-%m-%d %H:%M:%S')
-            fold_result['duration_seconds'] = round(time.time() - start_time, 2)
-            all_results.append(fold_result)
-            with open(moga_path, 'w') as f:
-                json.dump(all_results, f, indent=4)
+            logging.error(f"Error while running fold {fid}: {e}")
+            res_list.append({'fold_id': fid, 'status': 'error'})
+            json.dump(res_list, open(res_file, 'w'), indent=2)
 
-    logging.info(f"All folds done. Results saved to {moga_path}")
+        duration = time.time() - start
+        duration_td = datetime.timedelta(seconds=int(duration))
+        logging.info(f"Fold {fid} took {duration_td}")
+    logging.info("Done all folds")
 
-if __name__ == "__main__":
+if __name__=='__main__':
     main()
