@@ -103,6 +103,7 @@ def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.00
     val_y = val_df[target].values
     n_features = train_X.shape[1]
 
+
     def objective_function(params):
         lookback_window = int(params[0])
         n_units = int(params[1])
@@ -122,7 +123,7 @@ def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.00
             return 1e3, 1e3
         
         # train/val split
-        split = int(0.9 * len(windows))
+        split = int(0.8 * len(windows))
         X_tr, X_valsplit = windows[:split], windows[split:]
         y_tr, y_valsplit = targets[:split], targets[split:]
         # datasets
@@ -136,7 +137,8 @@ def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.00
         
         # fit
         try:
-            model.fit(ds_tr, validation_data=ds_v, epochs=epochs, callbacks=[es], verbose=0)
+            max_epochs = min(epochs, 50) 
+            model.fit(ds_tr, validation_data=ds_v, epochs=max_epochs, callbacks=[es], verbose=0)
             val_loss = model.evaluate(ds_v, verbose=0)
         except Exception as e:
             logging.error(f"Training failed: {e}")
@@ -171,8 +173,8 @@ def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.00
 class LSTMProblem(ElementwiseProblem):
     def __init__(self, obj_func):
         super().__init__(n_var=5, n_obj=2,
-                         xl=np.array([10, 32, 1e-4, 10, 0.0]),
-                         xu=np.array([50, 64, 1e-3, 50, 1.0]))
+                         xl=np.array([15, 32, 1e-4, 10, 0.0]),
+                         xu=np.array([35, 64, 1e-3, 50, 1.0]))
         self.obj = obj_func
     def _evaluate(self, x, out, *args, **kwargs):
         out['F'] = self.obj(x)
@@ -180,6 +182,8 @@ class LSTMProblem(ElementwiseProblem):
 # ------------------------ MAIN LOOP --------------------------
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--pop-size', type=int, default=15)
+    parser.add_argument('--n-gen', type=int, default=10) 
     parser.add_argument('--max-new-folds', type=int, default=None,
                         help='Max number of new folds to run before exiting')
     args = parser.parse_args()
@@ -188,7 +192,7 @@ def main():
     out_dir = 'data/tuning_results'
     fold_dir = 'data/processed_folds'
     os.makedirs(out_dir, exist_ok=True)
-    res_file = os.path.join(out_dir, 'test_2.json')
+    res_file = os.path.join(out_dir, 'final_moga_lstm_results.json')
 
     # load checkpoint
     try:
@@ -217,8 +221,8 @@ def main():
             feats = [c for c in train.columns if c not in ['Date','Ticker','Log_Returns','target']]
             obj = create_objective(train, val, feats)
             prob = LSTMProblem(obj)
-            alg = NSGA2(pop_size=10)
-            res = minimize(prob, alg, ('n_gen', 8), seed=42, verbose=False)
+            alg = NSGA2(pop_size=args.pop_size)
+            res = minimize(prob, alg, ('n_gen', args.n_gen), seed=42, verbose=False)
             solutions = []
 
             for x, f in zip(res.X, res.F):
@@ -236,7 +240,7 @@ def main():
             with open(res_file, 'w') as f:
                 json.dump(res_list, f, indent=2)
             new_runs += 1
-            
+
         except Exception as e:
             logging.error(f"Error in fold {fid}: {e}")
             res_list.append({'fold_id': fid, 'status': 'error'})
