@@ -22,11 +22,19 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 
 # ---------------------- CONFIG & LOGGING ----------------------
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(message)s")
+os.makedirs("logs", exist_ok=True)
+log_file = 'logs/tuning_lstm.log'
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(log_file),   
+        logging.StreamHandler()           
+    ]
+)
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-# GPU memory growth
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     for gpu in gpus:
@@ -38,7 +46,6 @@ else:
 # reproducibility
 tf.random.set_seed(42)
 np.random.seed(42)
-
 # ------------------------ CONSTANTS ---------------------------
 TRADING_DAYS = 252
 BATCH_SIZE = 32
@@ -139,7 +146,6 @@ def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.00
         try:
             max_epochs = min(epochs, 50) 
             model.fit(ds_tr, validation_data=ds_v, epochs=max_epochs, callbacks=[es], verbose=0)
-            val_loss = model.evaluate(ds_v, verbose=0)
         except Exception as e:
             logging.error(f"Training failed: {e}")
             return 1e3, 1e3
@@ -182,7 +188,7 @@ class LSTMProblem(ElementwiseProblem):
 # ------------------------ MAIN LOOP --------------------------
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pop-size', type=int, default=15)
+    parser.add_argument('--pop-size', type=int, default=12)
     parser.add_argument('--n-gen', type=int, default=10) 
     parser.add_argument('--max-new-folds', type=int, default=None,
                         help='Max number of new folds to run before exiting')
@@ -239,6 +245,7 @@ def main():
             res_list.append({'fold_id': fid, 'solutions': solutions, 'status': 'success'})
             with open(res_file, 'w') as f:
                 json.dump(res_list, f, indent=2)
+
             new_runs += 1
 
         except Exception as e:
