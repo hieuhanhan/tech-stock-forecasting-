@@ -23,8 +23,17 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 
 # ---------------------- CONFIG & LOGGING ----------------------
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(message)s")
+os.makedirs("logs", exist_ok=True)
+log_file = 'logs/tuning_gru.log'
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(log_file),   
+        logging.StreamHandler()           
+    ]
+)
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -214,6 +223,8 @@ class GRUProblem(ElementwiseProblem):
 # ------------------------ MAIN LOOP --------------------------
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--pop-size', type=int, default=12)
+    parser.add_argument('--n-gen', type=int, default=10) 
     parser.add_argument('--max-new-folds', type=int, default=None,
                         help='Max number of new folds to run before exiting')
     args = parser.parse_args()
@@ -237,16 +248,17 @@ def main():
     smap    = { f['global_fold_id']: f for f in summary }
 
     new_runs = 0
-    for fid in tqdm(reps, total=len(reps), desc='Processing folds'):
+    for i, fid in enumerate(reps, start=1):
+        print(f"\n[{i}/{len(reps)}] Running fold {fid}...\n")
+
         if fid in done:
-            logging.info(f"Skipping fold {fid} (already done)")
             continue
         if args.max_new_folds and new_runs >= args.max_new_folds:
-            logging.info(f"Reached limit of {args.max_new_folds} new folds; exiting.")
             break
 
         logging.info(f"Running fold {fid}...")
         start = time.time()
+
         try:
             train = pd.read_csv(os.path.join(fold_dir, smap[fid]['train_path_lstm_gru']))
             val   = pd.read_csv(os.path.join(fold_dir, smap[fid]['val_path_lstm_gru']))
@@ -254,10 +266,10 @@ def main():
 
             obj  = create_objective(train, val, feats)
             prob = GRUProblem(obj)
-            alg  = NSGA2(pop_size=20)
-            res  = minimize(prob, alg, ('n_gen', 15), seed=42, verbose=False)
-
+            alg = NSGA2(pop_size=args.pop_size)
+            res = minimize(prob, alg, ('n_gen', args.n_gen), seed=42, verbose=False)
             solutions = []
+            
             for x,f in zip(res.X, res.F):
                 solutions.append({
                     'lookback_window': int(x[0]),
@@ -268,6 +280,7 @@ def main():
                     'sharpe':          -f[0],
                     'max_drawdown':    f[1]
                 })
+
             res_list.append({'fold_id': fid, 'solutions': solutions, 'status': 'success'})
             with open(res_file, 'w') as f:
                 json.dump(res_list, f, indent=2)

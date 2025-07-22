@@ -213,11 +213,14 @@ def main():
     smap = {f['global_fold_id']: f for f in summary}
 
     new_runs = 0
-    for fid in tqdm(reps, desc='Processing folds', total=len(reps)):
+    for i, fid in enumerate(reps, start=1):
+        print(f"\n[{i}/{len(reps)}] Running fold {fid}...\n")
+
         if fid in done:
             continue
         if args.max_new_folds and new_runs >= args.max_new_folds:
             break
+
         logging.info(f"Running fold {fid}...")
         start = time.time()
 
@@ -253,6 +256,7 @@ def main():
             res_list.append({'fold_id': fid, 'status': 'error'})
             with open(res_file, 'w') as f:
                 json.dump(res_list, f, indent=2)
+
         # cleanup
         K.clear_session()
         gc.collect()
