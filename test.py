@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import json
 import logging
@@ -210,7 +211,6 @@ def main():
             break
         logging.info(f"Running fold {fid}...")
         start = time.time()
-
         try:
             train = pd.read_csv(os.path.join(fold_dir, smap[fid]['train_path_lstm_gru']))
             val = pd.read_csv(os.path.join(fold_dir, smap[fid]['val_path_lstm_gru']))
@@ -220,7 +220,6 @@ def main():
             alg = NSGA2(pop_size=10)
             res = minimize(prob, alg, ('n_gen', 8), seed=42, verbose=False)
             solutions = []
-
             for x, f in zip(res.X, res.F):
                 solutions.append({
                     'lookback_window': int(x[0]),
@@ -231,12 +230,10 @@ def main():
                     'sharpe': -f[0],
                     'max_drawdown': f[1]
                 })
-
             res_list.append({'fold_id': fid, 'solutions': solutions, 'status': 'success'})
             with open(res_file, 'w') as f:
                 json.dump(res_list, f, indent=2)
             new_runs += 1
-            
         except Exception as e:
             logging.error(f"Error in fold {fid}: {e}")
             res_list.append({'fold_id': fid, 'status': 'error'})
