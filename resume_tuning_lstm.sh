@@ -18,7 +18,10 @@ if [ -z "$POP_SIZE" ] || [ -z "$N_GEN" ]; then
 fi
 
 # 4. Make dir
-mkdir -p $LOCAL_DIR
+mkdir -p $LOCAL_DIR logs
+START_TIME=$(date)
+LOG_FILE="logs/tuning_log_$(date '+%Y%m%d_%H%M%S').log"
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 # 5. Download checkpoint file
 echo "Pulling checkpoint from S3..."
@@ -32,8 +35,24 @@ else
   python "$PYTHON_SCRIPT" --pop-size "$POP_SIZE" --n-gen "$N_GEN" --max-new-folds "$MAX_NEW_FOLDS"
 fi
 
-# 7. Upload results to S3
+#7. Check files 
+PYTHON_EXIT_CODE=$?
+if [ $PYTHON_EXIT_CODE -ne 0 ]; then
+  echo " Python script failed with exit code $PYTHON_EXIT_CODE"
+  exit $PYTHON_EXIT_CODE
+fi
+
+# 8. Upload results to S3
 echo "Uploading updated results to S3..."
 aws s3 cp "$LOCAL_DIR/$CHECKPOINT_FILE" "$S3_BUCKET/$CHECKPOINT_FILE"
 
-echo "All done. Checkpoint updated and uploaded."
+if [ $? -eq 0 ]; then
+  echo "Upload successful."
+else
+  echo "Upload failed!"
+  exit 1
+fi
+
+END_TIME=$(date)
+echo "Started at: $START_TIME"
+echo "Finished at: $END_TIME"
