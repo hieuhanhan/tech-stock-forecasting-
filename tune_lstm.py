@@ -162,7 +162,7 @@ class MOGAProblem(ElementwiseProblem):
 # objective for tier2 with walk-forward validation
 
 def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
-                                   retrain_interval=5, base_cost=BASE_COST):
+                                   retrain_interval, base_cost=BASE_COST):
     """
     Walk-forward LSTM backtest with periodic retraining every `retrain_interval` steps.
     - tr_df: in-sample dataframe
@@ -366,7 +366,8 @@ def main():
             vl = pd.read_csv(os.path.join(args.data_dir, info['val_path_lstm_gru']))
             feats = [c for c in tr.columns if c not in ['Date','Ticker','Log_Returns','target']]
             champ = tier1[fid]
-            obj = create_objective_moga(tr, vl, feats, champ)
+            obj = create_periodic_lstm_objective(tr, vl, feats, champ, retrain_interval, 
+                                                cost=BASE_COST + SLIPPAGE)
 
             # ensemble seeds with small perturbations
             multipliers = [0.9, 0.95, 1.0, 1.05, 1.1]

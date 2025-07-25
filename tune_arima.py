@@ -193,46 +193,75 @@ def main():
 
         for fid in tqdm(pending, desc='Tier1 ARIMA'):
             info = summary[fid]
-            train = pd.read_csv(os.path.join(args.data_dir, info['train_path_arima_prophet']), parse_dates=['Date'])
-            val   = pd.read_csv(os.path.join(args.data_dir, info['val_path_arima_prophet']), parse_dates=['Date'])
+            train = pd.read_csv(
+                os.path.join(args.data_dir, info['train_path_arima_prophet']),
+                parse_dates=['Date']
+            )
+            val = pd.read_csv(
+                os.path.join(args.data_dir, info['val_path_arima_prophet']),
+                parse_dates=['Date']
+            )
             train_ret = train['Log_Returns'].dropna().values
             val_ret   = val['Log_Returns'].values
 
-            ga_pop, ga_gen, bo_calls, top_n = get_params_for_volatility(vol_map.get(fid, 'medium'))
+            category = vol_map.get(fid, "medium")
+            ga_pop, ga_gen, bo_calls, top_n = get_params_for_volatility(category)
+            logging.info(f"Fold {fid}: Volatility={category}, GA(pop={ga_pop}, gen={ga_gen}), BO(calls={bo_calls})")
 
-            # GA global search
+            # GA global search with history capture 
+            algorithm = GA(pop_size=ga_pop,
+                           eliminate_duplicates=True,
+                           save_history=True)
+            
             res_ga = pymoo_minimize(
-            Tier1ARIMAProblem(train_ret, val_ret),
-            GA(pop_size=ga_pop, eliminate_duplicates=True),
-            ('n_gen', ga_gen),
-            verbose=False
+                Tier1ARIMAProblem(train_ret, val_ret),
+                algorithm,
+                ('n_gen', ga_gen),
+                verbose=False,
+                return_algorithm=True
             )
+            algorithm = res_ga.algorithm
+            logging.info(f"Collected {len(algorithm.history)} generations in GA history")
 
-            # select top seeds
-            top_inds = sorted(res_ga.pop, key=lambda ind: ind.F[0])[:top_n]
+            # collect the best (p,q,rmse) from each generation
+            history_best = []
+            for pop in algorithm.history:
+                best = min(pop, key=lambda ind: ind.F[0])
+                history_best.append((int(best.X[0]), int(best.X[1]), float(best.F[0])))
+            
+            if not history_best:
+                raise RuntimeError("GA history was empty—did you pass return_algorithm=True?")
+
+            # pick top_n unique seeds from history
+            all_individuals = [ind for pop in algorithm.history for ind in pop] 
             seen = set()
-            unique_top = []
-            for ind in top_inds:
-                key = (ind.X[0], ind.X[1])
+            unique_seeds = []
+            for ind in all_individuals:
+                key = (int(ind.X[0]), int(ind.X[1]))
                 if key not in seen:
                     seen.add(key)
-                    unique_top.append(ind)
+                    unique_seeds.append(ind)
 
-            x0 = [ind.X.tolist() for ind in unique_top]
-            y0 = [ind.F[0] for ind in unique_top]
+            unique_seeds.sort(key=lambda ind: ind.F[0])
+            top_seeds_for_bo = unique_seeds[:top_n]
+
+            x0 = [[int(ind.X[0]), int(ind.X[1])] for ind in top_seeds_for_bo]
+            y0 = [ind.F[0] for ind in top_seeds_for_bo]
 
             # BO local refinement
             res_bo = gp_minimize(
                 lambda x: arima_rmse(x, train_ret, val_ret),
                 dimensions=[Integer(1, 7), Integer(1, 7)],
                 n_calls=bo_calls,
-                x0=x0, y0=y0,
+                x0=x0,
+                y0=y0,
                 random_state=42
             )
 
             best_p, best_q = map(int, res_bo.x)
 
-            top_ga = [{'p': int(ind.X[0]), 'q': int(ind.X[1])} for ind in unique_top]
+            # record unique seeds in top_ga
+            top_ga = [{'p': p, 'q': q} for p, q, _ in unique_seeds]
             results.append({'fold_id': fid,
                             'best_params': {'p': best_p, 'd': 0, 'q': best_q},
                             'rmse': float(res_bo.fun),
