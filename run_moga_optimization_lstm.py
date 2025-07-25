@@ -111,7 +111,6 @@ def create_objective(train_df, val_df, features, target='Log_Returns', cost=0.00
     val_y = val_df[target].values
     n_features = train_X.shape[1]
 
-
     def objective_function(params):
         lookback_window = int(params[0])
         n_units = int(params[1])

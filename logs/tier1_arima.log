@@ -1,0 +1,599 @@
+2025-07-24 09:11:08,812 [INFO] Fold 52: starting GA(pop=20,gen=10)
+2025-07-24 09:11:08,847 [INFO] Fold 52: starting BO(n_calls=30)
+2025-07-24 09:25:26,142 [INFO] Fold 52: starting GA(pop=20,gen=15)
+2025-07-24 09:27:18,792 [INFO] Fold 52: starting GA(pop=20,gen=15)
+2025-07-24 09:28:30,908 [INFO] Fold 52: starting GA(pop=20,gen=15)
+2025-07-24 09:31:16,032 [INFO] Fold 52: starting GA(pop=20,gen=15)
+2025-07-24 09:31:16,056 [INFO] Fold 52: starting BO(n_calls=20)
+2025-07-24 09:31:20,417 [INFO] → Fold 52 done in 4.4s: p=2,q=5, RMSE=0.0158
+2025-07-24 09:31:20,438 [INFO] Fold 60: starting GA(pop=20,gen=15)
+2025-07-24 09:31:20,454 [INFO] Fold 60: starting BO(n_calls=20)
+2025-07-24 09:31:23,483 [INFO] → Fold 60 done in 3.0s: p=4,q=2, RMSE=0.0118
+2025-07-24 09:31:23,504 [INFO] Fold 72: starting GA(pop=20,gen=15)
+2025-07-24 09:31:23,520 [INFO] Fold 72: starting BO(n_calls=20)
+2025-07-24 09:31:27,770 [INFO] → Fold 72 done in 4.3s: p=6,q=6, RMSE=0.0062
+2025-07-24 09:31:27,791 [INFO] Fold 76: starting GA(pop=20,gen=15)
+2025-07-24 09:31:27,806 [INFO] Fold 76: starting BO(n_calls=20)
+2025-07-24 09:31:30,465 [INFO] → Fold 76 done in 2.7s: p=7,q=5, RMSE=0.0154
+2025-07-24 09:31:30,485 [INFO] Fold 90: starting GA(pop=20,gen=15)
+2025-07-24 09:31:30,502 [INFO] Fold 90: starting BO(n_calls=20)
+2025-07-24 09:31:34,195 [INFO] → Fold 90 done in 3.7s: p=2,q=2, RMSE=0.0105
+2025-07-24 09:31:34,217 [INFO] Fold 93: starting GA(pop=20,gen=15)
+2025-07-24 09:31:34,234 [INFO] Fold 93: starting BO(n_calls=20)
+2025-07-24 09:31:38,662 [INFO] → Fold 93 done in 4.4s: p=6,q=5, RMSE=0.0270
+2025-07-24 09:31:38,684 [INFO] Fold 102: starting GA(pop=20,gen=15)
+2025-07-24 09:31:38,700 [INFO] Fold 102: starting BO(n_calls=20)
+2025-07-24 09:31:41,946 [INFO] → Fold 102 done in 3.3s: p=2,q=2, RMSE=0.0157
+2025-07-24 09:31:41,968 [INFO] Fold 104: starting GA(pop=20,gen=15)
+2025-07-24 09:31:41,984 [INFO] Fold 104: starting BO(n_calls=20)
+2025-07-24 09:31:45,775 [INFO] → Fold 104 done in 3.8s: p=7,q=7, RMSE=0.0163
+2025-07-24 09:31:45,796 [INFO] Fold 113: starting GA(pop=20,gen=15)
+2025-07-24 09:31:45,812 [INFO] Fold 113: starting BO(n_calls=20)
+2025-07-24 09:31:50,176 [INFO] → Fold 113 done in 4.4s: p=3,q=3, RMSE=0.0257
+2025-07-24 09:31:50,198 [INFO] Fold 119: starting GA(pop=20,gen=15)
+2025-07-24 09:31:50,214 [INFO] Fold 119: starting BO(n_calls=20)
+2025-07-24 09:31:54,161 [INFO] → Fold 119 done in 4.0s: p=1,q=3, RMSE=0.0126
+2025-07-24 09:31:54,181 [INFO] Fold 150: starting GA(pop=20,gen=15)
+2025-07-24 09:31:54,197 [INFO] Fold 150: starting BO(n_calls=20)
+2025-07-24 09:31:58,354 [INFO] → Fold 150 done in 4.2s: p=1,q=4, RMSE=0.0252
+2025-07-24 09:31:58,376 [INFO] Fold 158: starting GA(pop=20,gen=15)
+2025-07-24 09:31:58,393 [INFO] Fold 158: starting BO(n_calls=20)
+2025-07-24 09:32:01,548 [INFO] → Fold 158 done in 3.2s: p=6,q=5, RMSE=0.0244
+2025-07-24 09:32:01,569 [INFO] Fold 161: starting GA(pop=20,gen=15)
+2025-07-24 09:32:01,584 [INFO] Fold 161: starting BO(n_calls=20)
+2025-07-24 09:32:05,363 [INFO] → Fold 161 done in 3.8s: p=1,q=1, RMSE=0.0153
+2025-07-24 09:32:05,383 [INFO] Fold 163: starting GA(pop=20,gen=15)
+2025-07-24 09:32:05,401 [INFO] Fold 163: starting BO(n_calls=20)
+2025-07-24 09:32:09,798 [INFO] → Fold 163 done in 4.4s: p=7,q=5, RMSE=0.0285
+2025-07-24 09:32:09,819 [INFO] Fold 171: starting GA(pop=20,gen=15)
+2025-07-24 09:32:09,836 [INFO] Fold 171: starting BO(n_calls=20)
+2025-07-24 09:32:13,312 [INFO] → Fold 171 done in 3.5s: p=5,q=1, RMSE=0.0130
+2025-07-24 09:32:13,335 [INFO] Fold 174: starting GA(pop=20,gen=15)
+2025-07-24 09:32:13,351 [INFO] Fold 174: starting BO(n_calls=20)
+2025-07-24 09:32:17,319 [INFO] → Fold 174 done in 4.0s: p=6,q=5, RMSE=0.0097
+2025-07-24 09:32:17,339 [INFO] Fold 182: starting GA(pop=20,gen=15)
+2025-07-24 09:32:17,354 [INFO] Fold 182: starting BO(n_calls=20)
+2025-07-24 09:32:20,999 [INFO] → Fold 182 done in 3.7s: p=1,q=4, RMSE=0.0108
+2025-07-24 09:32:21,021 [INFO] Fold 191: starting GA(pop=20,gen=15)
+2025-07-24 09:32:21,037 [INFO] Fold 191: starting BO(n_calls=20)
+2025-07-24 09:32:24,052 [INFO] → Fold 191 done in 3.0s: p=7,q=5, RMSE=0.0105
+2025-07-24 09:32:24,073 [INFO] Fold 192: starting GA(pop=20,gen=15)
+2025-07-24 09:32:24,090 [INFO] Fold 192: starting BO(n_calls=20)
+2025-07-24 09:32:28,833 [INFO] → Fold 192 done in 4.8s: p=7,q=3, RMSE=0.0132
+2025-07-24 09:32:28,855 [INFO] Fold 215: starting GA(pop=20,gen=15)
+2025-07-24 09:32:28,871 [INFO] Fold 215: starting BO(n_calls=20)
+2025-07-24 09:32:33,420 [INFO] → Fold 215 done in 4.6s: p=3,q=1, RMSE=0.0225
+2025-07-24 09:32:33,442 [INFO] Fold 229: starting GA(pop=20,gen=15)
+2025-07-24 09:32:33,458 [INFO] Fold 229: starting BO(n_calls=20)
+2025-07-24 09:32:36,653 [INFO] → Fold 229 done in 3.2s: p=7,q=4, RMSE=0.0111
+2025-07-24 09:32:36,674 [INFO] Fold 230: starting GA(pop=20,gen=15)
+2025-07-24 09:32:36,690 [INFO] Fold 230: starting BO(n_calls=20)
+2025-07-24 09:32:39,938 [INFO] → Fold 230 done in 3.3s: p=6,q=7, RMSE=0.0123
+2025-07-24 09:32:39,960 [INFO] Fold 248: starting GA(pop=20,gen=15)
+2025-07-24 09:32:39,977 [INFO] Fold 248: starting BO(n_calls=20)
+2025-07-24 09:32:42,921 [INFO] → Fold 248 done in 3.0s: p=5,q=6, RMSE=0.0101
+2025-07-24 09:32:42,942 [INFO] Fold 253: starting GA(pop=20,gen=15)
+2025-07-24 09:32:42,959 [INFO] Fold 253: starting BO(n_calls=20)
+2025-07-24 09:32:46,371 [INFO] → Fold 253 done in 3.4s: p=2,q=4, RMSE=0.0107
+2025-07-24 09:32:46,392 [INFO] Fold 268: starting GA(pop=20,gen=15)
+2025-07-24 09:32:46,408 [INFO] Fold 268: starting BO(n_calls=20)
+2025-07-24 09:32:50,382 [INFO] → Fold 268 done in 4.0s: p=6,q=4, RMSE=0.0165
+2025-07-24 09:32:50,403 [INFO] Fold 275: starting GA(pop=20,gen=15)
+2025-07-24 09:32:50,419 [INFO] Fold 275: starting BO(n_calls=20)
+2025-07-24 09:32:54,623 [INFO] → Fold 275 done in 4.2s: p=7,q=7, RMSE=0.0071
+2025-07-24 09:32:54,644 [INFO] Fold 281: starting GA(pop=20,gen=15)
+2025-07-24 09:32:54,660 [INFO] Fold 281: starting BO(n_calls=20)
+2025-07-24 09:32:58,323 [INFO] → Fold 281 done in 3.7s: p=7,q=5, RMSE=0.0092
+2025-07-24 09:32:58,343 [INFO] Fold 282: starting GA(pop=20,gen=15)
+2025-07-24 09:32:58,359 [INFO] Fold 282: starting BO(n_calls=20)
+2025-07-24 09:33:01,977 [INFO] → Fold 282 done in 3.6s: p=7,q=5, RMSE=0.0093
+2025-07-24 09:33:01,999 [INFO] Fold 288: starting GA(pop=20,gen=15)
+2025-07-24 09:33:02,016 [INFO] Fold 288: starting BO(n_calls=20)
+2025-07-24 09:33:05,730 [INFO] → Fold 288 done in 3.7s: p=4,q=2, RMSE=0.0095
+2025-07-24 09:33:05,751 [INFO] Fold 291: starting GA(pop=20,gen=15)
+2025-07-24 09:33:05,767 [INFO] Fold 291: starting BO(n_calls=20)
+2025-07-24 09:33:09,359 [INFO] → Fold 291 done in 3.6s: p=6,q=5, RMSE=0.0198
+2025-07-24 09:33:09,380 [INFO] Fold 292: starting GA(pop=20,gen=15)
+2025-07-24 09:33:09,396 [INFO] Fold 292: starting BO(n_calls=20)
+2025-07-24 09:33:12,092 [INFO] → Fold 292 done in 2.7s: p=7,q=5, RMSE=0.0226
+2025-07-24 09:33:12,113 [INFO] Fold 311: starting GA(pop=20,gen=15)
+2025-07-24 09:33:12,128 [INFO] Fold 311: starting BO(n_calls=20)
+2025-07-24 09:33:16,532 [INFO] → Fold 311 done in 4.4s: p=6,q=7, RMSE=0.0100
+2025-07-24 09:33:16,553 [INFO] Fold 317: starting GA(pop=20,gen=15)
+2025-07-24 09:33:16,570 [INFO] Fold 317: starting BO(n_calls=20)
+2025-07-24 09:33:20,493 [INFO] → Fold 317 done in 3.9s: p=7,q=7, RMSE=0.0226
+2025-07-24 09:33:20,515 [INFO] Fold 321: starting GA(pop=20,gen=15)
+2025-07-24 09:33:20,530 [INFO] Fold 321: starting BO(n_calls=20)
+2025-07-24 09:40:24,534 [INFO] Fold 52: starting GA(pop=30,gen=15)
+2025-07-24 09:40:24,561 [INFO] Fold 52: starting BO(n_calls=40)
+2025-07-24 09:40:35,236 [INFO] → Fold 52 done in 10.7s: p=6,q=6, RMSE=0.0158
+2025-07-24 09:40:35,258 [INFO] Fold 60: starting GA(pop=30,gen=15)
+2025-07-24 09:40:35,280 [INFO] Fold 60: starting BO(n_calls=40)
+2025-07-24 09:40:45,401 [INFO] → Fold 60 done in 10.1s: p=1,q=2, RMSE=0.0115
+2025-07-24 09:40:45,421 [INFO] Fold 72: starting GA(pop=30,gen=15)
+2025-07-24 09:40:45,442 [INFO] Fold 72: starting BO(n_calls=40)
+2025-07-24 09:40:55,007 [INFO] → Fold 72 done in 9.6s: p=1,q=1, RMSE=0.0062
+2025-07-24 09:40:55,028 [INFO] Fold 76: starting GA(pop=30,gen=15)
+2025-07-24 09:40:55,049 [INFO] Fold 76: starting BO(n_calls=40)
+2025-07-24 09:41:03,319 [INFO] → Fold 76 done in 8.3s: p=6,q=7, RMSE=0.0154
+2025-07-24 09:41:03,341 [INFO] Fold 90: starting GA(pop=30,gen=15)
+2025-07-24 09:41:03,361 [INFO] Fold 90: starting BO(n_calls=40)
+2025-07-24 09:41:12,649 [INFO] → Fold 90 done in 9.3s: p=2,q=2, RMSE=0.0105
+2025-07-24 09:41:12,668 [INFO] Fold 93: starting GA(pop=30,gen=15)
+2025-07-24 09:41:12,688 [INFO] Fold 93: starting BO(n_calls=40)
+2025-07-24 09:41:23,324 [INFO] → Fold 93 done in 10.7s: p=6,q=5, RMSE=0.0270
+2025-07-24 09:41:23,345 [INFO] Fold 102: starting GA(pop=30,gen=15)
+2025-07-24 09:41:23,366 [INFO] Fold 102: starting BO(n_calls=40)
+2025-07-24 09:41:33,312 [INFO] → Fold 102 done in 10.0s: p=4,q=2, RMSE=0.0157
+2025-07-24 09:41:33,334 [INFO] Fold 104: starting GA(pop=30,gen=15)
+2025-07-24 09:41:33,353 [INFO] Fold 104: starting BO(n_calls=40)
+2025-07-24 09:41:43,046 [INFO] → Fold 104 done in 9.7s: p=6,q=7, RMSE=0.0163
+2025-07-24 09:41:43,067 [INFO] Fold 113: starting GA(pop=30,gen=15)
+2025-07-24 09:41:43,088 [INFO] Fold 113: starting BO(n_calls=40)
+2025-07-24 09:41:53,697 [INFO] → Fold 113 done in 10.6s: p=2,q=1, RMSE=0.0255
+2025-07-24 09:41:53,719 [INFO] Fold 119: starting GA(pop=30,gen=15)
+2025-07-24 09:41:53,740 [INFO] Fold 119: starting BO(n_calls=40)
+2025-07-24 09:42:03,840 [INFO] → Fold 119 done in 10.1s: p=1,q=1, RMSE=0.0125
+2025-07-24 09:42:03,862 [INFO] Fold 150: starting GA(pop=30,gen=15)
+2025-07-24 09:42:03,884 [INFO] Fold 150: starting BO(n_calls=40)
+2025-07-24 09:42:12,477 [INFO] → Fold 150 done in 8.6s: p=3,q=1, RMSE=0.0252
+2025-07-24 09:42:12,499 [INFO] Fold 158: starting GA(pop=30,gen=15)
+2025-07-24 09:42:12,519 [INFO] Fold 158: starting BO(n_calls=40)
+2025-07-24 09:42:21,699 [INFO] → Fold 158 done in 9.2s: p=6,q=5, RMSE=0.0244
+2025-07-24 09:42:21,720 [INFO] Fold 161: starting GA(pop=30,gen=15)
+2025-07-24 09:42:21,742 [INFO] Fold 161: starting BO(n_calls=40)
+2025-07-24 09:42:31,761 [INFO] → Fold 161 done in 10.0s: p=5,q=5, RMSE=0.0150
+2025-07-24 09:42:31,782 [INFO] Fold 163: starting GA(pop=30,gen=15)
+2025-07-24 09:42:31,803 [INFO] Fold 163: starting BO(n_calls=40)
+2025-07-24 09:42:41,113 [INFO] → Fold 163 done in 9.3s: p=3,q=4, RMSE=0.0283
+2025-07-24 09:42:41,135 [INFO] Fold 171: starting GA(pop=30,gen=15)
+2025-07-24 09:42:41,156 [INFO] Fold 171: starting BO(n_calls=40)
+2025-07-24 09:42:50,613 [INFO] → Fold 171 done in 9.5s: p=5,q=1, RMSE=0.0130
+2025-07-24 09:42:50,634 [INFO] Fold 174: starting GA(pop=30,gen=15)
+2025-07-24 09:42:50,669 [INFO] Fold 174: starting BO(n_calls=40)
+2025-07-24 09:43:00,924 [INFO] → Fold 174 done in 10.3s: p=6,q=4, RMSE=0.0096
+2025-07-24 09:43:00,945 [INFO] Fold 182: starting GA(pop=30,gen=15)
+2025-07-24 09:43:00,967 [INFO] Fold 182: starting BO(n_calls=40)
+2025-07-24 09:43:12,438 [INFO] → Fold 182 done in 11.5s: p=7,q=6, RMSE=0.0107
+2025-07-24 09:43:12,459 [INFO] Fold 191: starting GA(pop=30,gen=15)
+2025-07-24 09:43:12,479 [INFO] Fold 191: starting BO(n_calls=40)
+2025-07-24 09:43:21,782 [INFO] → Fold 191 done in 9.3s: p=7,q=5, RMSE=0.0105
+2025-07-24 09:43:21,803 [INFO] Fold 192: starting GA(pop=30,gen=15)
+2025-07-24 09:43:21,825 [INFO] Fold 192: starting BO(n_calls=40)
+2025-07-24 09:43:32,290 [INFO] → Fold 192 done in 10.5s: p=7,q=3, RMSE=0.0132
+2025-07-24 09:43:32,311 [INFO] Fold 215: starting GA(pop=30,gen=15)
+2025-07-24 09:43:32,333 [INFO] Fold 215: starting BO(n_calls=40)
+2025-07-24 09:43:41,980 [INFO] → Fold 215 done in 9.7s: p=2,q=3, RMSE=0.0225
+2025-07-24 09:43:42,001 [INFO] Fold 229: starting GA(pop=30,gen=15)
+2025-07-24 09:43:42,022 [INFO] Fold 229: starting BO(n_calls=40)
+2025-07-24 09:43:49,406 [INFO] → Fold 229 done in 7.4s: p=7,q=1, RMSE=0.0111
+2025-07-24 09:43:49,428 [INFO] Fold 230: starting GA(pop=30,gen=15)
+2025-07-24 09:43:49,449 [INFO] Fold 230: starting BO(n_calls=40)
+2025-07-24 09:43:58,057 [INFO] → Fold 230 done in 8.6s: p=4,q=6, RMSE=0.0124
+2025-07-24 09:43:58,077 [INFO] Fold 248: starting GA(pop=30,gen=15)
+2025-07-24 09:43:58,098 [INFO] Fold 248: starting BO(n_calls=40)
+2025-07-24 09:44:06,759 [INFO] → Fold 248 done in 8.7s: p=6,q=6, RMSE=0.0101
+2025-07-24 09:44:06,782 [INFO] Fold 253: starting GA(pop=30,gen=15)
+2025-07-24 09:44:06,805 [INFO] Fold 253: starting BO(n_calls=40)
+2025-07-24 09:44:17,261 [INFO] → Fold 253 done in 10.5s: p=3,q=3, RMSE=0.0107
+2025-07-24 09:44:17,284 [INFO] Fold 268: starting GA(pop=30,gen=15)
+2025-07-24 09:44:17,304 [INFO] Fold 268: starting BO(n_calls=40)
+2025-07-24 09:44:26,395 [INFO] → Fold 268 done in 9.1s: p=4,q=4, RMSE=0.0162
+2025-07-24 09:44:26,416 [INFO] Fold 275: starting GA(pop=30,gen=15)
+2025-07-24 09:44:26,437 [INFO] Fold 275: starting BO(n_calls=40)
+2025-07-24 09:44:34,869 [INFO] → Fold 275 done in 8.5s: p=5,q=5, RMSE=0.0071
+2025-07-24 09:44:34,890 [INFO] Fold 281: starting GA(pop=30,gen=15)
+2025-07-24 09:44:34,911 [INFO] Fold 281: starting BO(n_calls=40)
+2025-07-24 09:44:44,476 [INFO] → Fold 281 done in 9.6s: p=7,q=5, RMSE=0.0092
+2025-07-24 09:44:44,498 [INFO] Fold 282: starting GA(pop=30,gen=15)
+2025-07-24 09:44:44,518 [INFO] Fold 282: starting BO(n_calls=40)
+2025-07-24 09:44:55,981 [INFO] → Fold 282 done in 11.5s: p=7,q=5, RMSE=0.0093
+2025-07-24 09:44:56,003 [INFO] Fold 288: starting GA(pop=30,gen=15)
+2025-07-24 09:44:56,024 [INFO] Fold 288: starting BO(n_calls=40)
+2025-07-24 09:45:05,750 [INFO] → Fold 288 done in 9.7s: p=4,q=1, RMSE=0.0095
+2025-07-24 09:45:05,772 [INFO] Fold 291: starting GA(pop=30,gen=15)
+2025-07-24 09:45:05,792 [INFO] Fold 291: starting BO(n_calls=40)
+2025-07-24 09:45:15,418 [INFO] → Fold 291 done in 9.6s: p=6,q=5, RMSE=0.0198
+2025-07-24 09:45:15,440 [INFO] Fold 292: starting GA(pop=30,gen=15)
+2025-07-24 09:45:15,460 [INFO] Fold 292: starting BO(n_calls=40)
+2025-07-24 09:45:23,667 [INFO] → Fold 292 done in 8.2s: p=7,q=6, RMSE=0.0226
+2025-07-24 09:45:23,689 [INFO] Fold 311: starting GA(pop=30,gen=15)
+2025-07-24 09:45:23,710 [INFO] Fold 311: starting BO(n_calls=40)
+2025-07-24 09:45:33,754 [INFO] → Fold 311 done in 10.1s: p=7,q=6, RMSE=0.0104
+2025-07-24 09:45:33,777 [INFO] Fold 317: starting GA(pop=30,gen=15)
+2025-07-24 09:45:33,798 [INFO] Fold 317: starting BO(n_calls=40)
+2025-07-24 09:45:43,941 [INFO] → Fold 317 done in 10.2s: p=7,q=7, RMSE=0.0226
+2025-07-24 09:45:43,964 [INFO] Fold 321: starting GA(pop=30,gen=15)
+2025-07-24 09:45:43,986 [INFO] Fold 321: starting BO(n_calls=40)
+2025-07-24 09:45:53,976 [INFO] → Fold 321 done in 10.0s: p=7,q=2, RMSE=0.0293
+2025-07-24 09:45:54,000 [INFO] Fold 322: starting GA(pop=30,gen=15)
+2025-07-24 09:45:54,021 [INFO] Fold 322: starting BO(n_calls=40)
+2025-07-24 09:46:04,775 [INFO] → Fold 322 done in 10.8s: p=4,q=2, RMSE=0.0216
+2025-07-24 09:46:04,798 [INFO] Fold 325: starting GA(pop=30,gen=15)
+2025-07-24 09:46:04,818 [INFO] Fold 325: starting BO(n_calls=40)
+2025-07-24 09:46:15,215 [INFO] → Fold 325 done in 10.4s: p=7,q=6, RMSE=0.0166
+2025-07-24 09:46:15,237 [INFO] Fold 343: starting GA(pop=30,gen=15)
+2025-07-24 09:46:15,259 [INFO] Fold 343: starting BO(n_calls=40)
+2025-07-24 09:46:25,900 [INFO] → Fold 343 done in 10.7s: p=2,q=1, RMSE=0.0282
+2025-07-24 09:46:25,920 [INFO] Fold 353: starting GA(pop=30,gen=15)
+2025-07-24 09:46:25,943 [INFO] Fold 353: starting BO(n_calls=40)
+2025-07-24 09:46:36,455 [INFO] → Fold 353 done in 10.5s: p=2,q=2, RMSE=0.0117
+2025-07-24 09:46:36,477 [INFO] Fold 358: starting GA(pop=30,gen=15)
+2025-07-24 09:46:36,498 [INFO] Fold 358: starting BO(n_calls=40)
+2025-07-24 09:46:46,779 [INFO] → Fold 358 done in 10.3s: p=2,q=7, RMSE=0.0133
+2025-07-24 09:46:46,801 [INFO] Fold 366: starting GA(pop=30,gen=15)
+2025-07-24 09:46:46,823 [INFO] Fold 366: starting BO(n_calls=40)
+2025-07-24 09:46:55,989 [INFO] → Fold 366 done in 9.2s: p=3,q=2, RMSE=0.0184
+2025-07-24 09:46:56,011 [INFO] Fold 373: starting GA(pop=30,gen=15)
+2025-07-24 09:46:56,032 [INFO] Fold 373: starting BO(n_calls=40)
+2025-07-24 09:47:04,601 [INFO] → Fold 373 done in 8.6s: p=2,q=6, RMSE=0.0355
+2025-07-24 09:47:04,624 [INFO] Fold 408: starting GA(pop=30,gen=15)
+2025-07-24 09:47:04,645 [INFO] Fold 408: starting BO(n_calls=40)
+2025-07-24 09:47:14,109 [INFO] → Fold 408 done in 9.5s: p=6,q=6, RMSE=0.0137
+2025-07-24 09:47:14,132 [INFO] Fold 433: starting GA(pop=30,gen=15)
+2025-07-24 09:47:14,153 [INFO] Fold 433: starting BO(n_calls=40)
+2025-07-24 09:47:24,795 [INFO] → Fold 433 done in 10.7s: p=4,q=7, RMSE=0.0109
+2025-07-24 09:47:24,817 [INFO] Fold 455: starting GA(pop=30,gen=15)
+2025-07-24 09:47:24,837 [INFO] Fold 455: starting BO(n_calls=40)
+2025-07-24 09:47:33,313 [INFO] → Fold 455 done in 8.5s: p=7,q=7, RMSE=0.0108
+2025-07-24 09:47:33,336 [INFO] Fold 461: starting GA(pop=30,gen=15)
+2025-07-24 09:47:33,358 [INFO] Fold 461: starting BO(n_calls=40)
+2025-07-24 09:47:42,934 [INFO] → Fold 461 done in 9.6s: p=7,q=7, RMSE=0.0059
+2025-07-24 09:47:42,955 [INFO] Fold 479: starting GA(pop=30,gen=15)
+2025-07-24 09:47:42,976 [INFO] Fold 479: starting BO(n_calls=40)
+2025-07-24 09:47:53,467 [INFO] → Fold 479 done in 10.5s: p=7,q=7, RMSE=0.0189
+2025-07-24 09:47:53,488 [INFO] Fold 486: starting GA(pop=30,gen=15)
+2025-07-24 09:47:53,511 [INFO] Fold 486: starting BO(n_calls=40)
+2025-07-24 09:48:03,295 [INFO] → Fold 486 done in 9.8s: p=5,q=7, RMSE=0.0127
+2025-07-24 09:48:03,317 [INFO] Fold 492: starting GA(pop=30,gen=15)
+2025-07-24 09:48:03,339 [INFO] Fold 492: starting BO(n_calls=40)
+2025-07-24 09:48:12,548 [INFO] → Fold 492 done in 9.2s: p=6,q=3, RMSE=0.0084
+2025-07-24 09:48:12,570 [INFO] Fold 493: starting GA(pop=30,gen=15)
+2025-07-24 09:48:12,591 [INFO] Fold 493: starting BO(n_calls=40)
+2025-07-24 09:48:20,387 [INFO] → Fold 493 done in 7.8s: p=6,q=6, RMSE=0.0045
+2025-07-24 09:48:20,409 [INFO] Fold 506: starting GA(pop=30,gen=15)
+2025-07-24 09:48:20,429 [INFO] Fold 506: starting BO(n_calls=40)
+2025-07-24 09:48:28,341 [INFO] → Fold 506 done in 7.9s: p=5,q=2, RMSE=0.0028
+2025-07-24 09:48:28,363 [INFO] Fold 507: starting GA(pop=30,gen=15)
+2025-07-24 09:48:28,384 [INFO] Fold 507: starting BO(n_calls=40)
+2025-07-24 09:48:37,155 [INFO] → Fold 507 done in 8.8s: p=5,q=3, RMSE=0.0022
+2025-07-24 09:48:37,175 [INFO] Fold 508: starting GA(pop=30,gen=15)
+2025-07-24 09:48:37,196 [INFO] Fold 508: starting BO(n_calls=40)
+2025-07-24 09:48:45,318 [INFO] → Fold 508 done in 8.1s: p=7,q=6, RMSE=0.0029
+2025-07-24 09:48:45,338 [INFO] Fold 517: starting GA(pop=30,gen=15)
+2025-07-24 09:48:45,360 [INFO] Fold 517: starting BO(n_calls=40)
+2025-07-24 09:48:54,416 [INFO] → Fold 517 done in 9.1s: p=7,q=5, RMSE=0.0011
+2025-07-24 09:48:54,437 [INFO] Fold 518: starting GA(pop=30,gen=15)
+2025-07-24 09:48:54,458 [INFO] Fold 518: starting BO(n_calls=40)
+2025-07-24 09:49:03,211 [INFO] → Fold 518 done in 8.8s: p=1,q=6, RMSE=0.0038
+2025-07-24 09:49:03,234 [INFO] Fold 520: starting GA(pop=30,gen=15)
+2025-07-24 09:49:03,254 [INFO] Fold 520: starting BO(n_calls=40)
+2025-07-24 09:49:13,578 [INFO] → Fold 520 done in 10.3s: p=4,q=6, RMSE=0.0009
+2025-07-24 09:49:13,605 [INFO] Fold 524: starting GA(pop=30,gen=15)
+2025-07-24 09:49:13,626 [INFO] Fold 524: starting BO(n_calls=40)
+2025-07-24 09:49:22,276 [INFO] → Fold 524 done in 8.7s: p=5,q=7, RMSE=0.0011
+2025-07-24 09:49:22,298 [INFO] Fold 534: starting GA(pop=30,gen=15)
+2025-07-24 09:49:22,320 [INFO] Fold 534: starting BO(n_calls=40)
+2025-07-24 09:49:31,941 [INFO] → Fold 534 done in 9.6s: p=4,q=2, RMSE=0.0015
+2025-07-24 09:49:31,964 [INFO] Fold 535: starting GA(pop=30,gen=15)
+2025-07-24 09:49:31,988 [INFO] Fold 535: starting BO(n_calls=40)
+2025-07-24 09:49:41,795 [INFO] → Fold 535 done in 9.8s: p=5,q=6, RMSE=0.0030
+2025-07-24 09:49:41,819 [INFO] Fold 546: starting GA(pop=30,gen=15)
+2025-07-24 09:49:41,840 [INFO] Fold 546: starting BO(n_calls=40)
+2025-07-24 09:49:52,614 [INFO] → Fold 546 done in 10.8s: p=7,q=3, RMSE=0.0040
+2025-07-24 09:49:52,636 [INFO] Fold 557: starting GA(pop=30,gen=15)
+2025-07-24 09:49:52,658 [INFO] Fold 557: starting BO(n_calls=40)
+2025-07-24 09:50:00,848 [INFO] → Fold 557 done in 8.2s: p=1,q=7, RMSE=0.0157
+2025-07-24 09:50:00,870 [INFO] Fold 590: starting GA(pop=30,gen=15)
+2025-07-24 09:50:00,892 [INFO] Fold 590: starting BO(n_calls=40)
+2025-07-24 09:50:10,760 [INFO] → Fold 590 done in 9.9s: p=3,q=2, RMSE=0.0206
+2025-07-24 09:50:10,782 [INFO] Fold 595: starting GA(pop=30,gen=15)
+2025-07-24 09:50:10,802 [INFO] Fold 595: starting BO(n_calls=40)
+2025-07-24 09:50:19,923 [INFO] → Fold 595 done in 9.1s: p=1,q=4, RMSE=0.0207
+2025-07-24 09:50:19,944 [INFO] Fold 601: starting GA(pop=30,gen=15)
+2025-07-24 09:50:19,965 [INFO] Fold 601: starting BO(n_calls=40)
+2025-07-24 09:50:31,303 [INFO] → Fold 601 done in 11.4s: p=7,q=5, RMSE=0.0448
+2025-07-24 09:50:31,324 [INFO] Fold 616: starting GA(pop=30,gen=15)
+2025-07-24 09:50:31,345 [INFO] Fold 616: starting BO(n_calls=40)
+2025-07-24 09:50:40,732 [INFO] → Fold 616 done in 9.4s: p=5,q=3, RMSE=0.0523
+2025-07-24 09:50:40,754 [INFO] Fold 617: starting GA(pop=30,gen=15)
+2025-07-24 09:50:40,775 [INFO] Fold 617: starting BO(n_calls=40)
+2025-07-24 09:50:51,162 [INFO] → Fold 617 done in 10.4s: p=3,q=3, RMSE=0.0521
+2025-07-24 09:50:51,186 [INFO] Fold 632: starting GA(pop=30,gen=15)
+2025-07-24 09:50:51,206 [INFO] Fold 632: starting BO(n_calls=40)
+2025-07-24 09:51:02,039 [INFO] → Fold 632 done in 10.9s: p=6,q=2, RMSE=0.0247
+2025-07-24 09:51:02,060 [INFO] Fold 633: starting GA(pop=30,gen=15)
+2025-07-24 09:51:02,081 [INFO] Fold 633: starting BO(n_calls=40)
+2025-07-24 09:54:37,173 [INFO] Fold 52: starting GA(pop=30,gen=15)
+2025-07-24 09:54:37,201 [INFO] Fold 52: starting BO(n_calls=40)
+2025-07-24 09:54:48,425 [INFO] → Fold 52 done in 11.3s: p=6,q=6, RMSE=0.0158
+2025-07-24 09:54:48,447 [INFO] Fold 60: starting GA(pop=30,gen=15)
+2025-07-24 09:54:48,468 [INFO] Fold 60: starting BO(n_calls=40)
+2025-07-24 09:54:59,079 [INFO] → Fold 60 done in 10.6s: p=1,q=2, RMSE=0.0115
+2025-07-24 09:54:59,100 [INFO] Fold 72: starting GA(pop=30,gen=15)
+2025-07-24 09:54:59,122 [INFO] Fold 72: starting BO(n_calls=40)
+2025-07-24 09:55:09,212 [INFO] → Fold 72 done in 10.1s: p=1,q=1, RMSE=0.0062
+2025-07-24 09:55:09,231 [INFO] === Tier-1 ARIMA complete ===
+2025-07-24 10:02:16,091 [INFO] Resuming 3 completed folds
+2025-07-24 10:02:16,108 [INFO] Fold 76: starting GA(pop=20,gen=10)
+2025-07-24 10:02:16,124 [INFO] Fold 76: starting BO(n_calls=30)
+2025-07-24 10:02:22,599 [INFO] → Fold 76 done in 6.5s: p=4,q=7, RMSE=0.0154
+2025-07-24 10:02:22,619 [INFO] Fold 90: starting GA(pop=20,gen=10)
+2025-07-24 10:02:22,630 [INFO] Fold 90: starting BO(n_calls=30)
+2025-07-24 10:02:29,350 [INFO] → Fold 90 done in 6.7s: p=1,q=1, RMSE=0.0105
+2025-07-24 10:02:29,371 [INFO] Fold 93: starting GA(pop=20,gen=10)
+2025-07-24 10:02:29,399 [INFO] Fold 93: starting BO(n_calls=30)
+2025-07-24 10:02:35,917 [INFO] → Fold 93 done in 6.5s: p=6,q=5, RMSE=0.0270
+2025-07-24 10:02:35,938 [INFO] Fold 102: starting GA(pop=20,gen=10)
+2025-07-24 10:02:35,949 [INFO] Fold 102: starting BO(n_calls=30)
+2025-07-24 10:02:42,544 [INFO] → Fold 102 done in 6.6s: p=4,q=1, RMSE=0.0157
+2025-07-24 10:02:42,566 [INFO] Fold 104: starting GA(pop=20,gen=10)
+2025-07-24 10:02:42,577 [INFO] Fold 104: starting BO(n_calls=30)
+2025-07-24 10:02:49,857 [INFO] → Fold 104 done in 7.3s: p=7,q=7, RMSE=0.0163
+2025-07-24 10:02:49,878 [INFO] Fold 113: starting GA(pop=20,gen=10)
+2025-07-24 10:02:49,889 [INFO] Fold 113: starting BO(n_calls=30)
+2025-07-24 10:02:57,910 [INFO] → Fold 113 done in 8.0s: p=2,q=1, RMSE=0.0255
+2025-07-24 10:02:57,931 [INFO] Fold 119: starting GA(pop=20,gen=10)
+2025-07-24 10:02:57,943 [INFO] Fold 119: starting BO(n_calls=30)
+2025-07-24 10:03:04,586 [INFO] → Fold 119 done in 6.7s: p=1,q=3, RMSE=0.0126
+2025-07-24 10:03:04,607 [INFO] Fold 150: starting GA(pop=20,gen=10)
+2025-07-24 10:03:04,617 [INFO] Fold 150: starting BO(n_calls=30)
+2025-07-24 10:03:12,155 [INFO] → Fold 150 done in 7.5s: p=1,q=4, RMSE=0.0252
+2025-07-24 10:03:12,177 [INFO] Fold 158: starting GA(pop=20,gen=10)
+2025-07-24 10:03:12,187 [INFO] Fold 158: starting BO(n_calls=30)
+2025-07-24 10:03:18,927 [INFO] → Fold 158 done in 6.8s: p=6,q=5, RMSE=0.0244
+2025-07-24 10:03:18,947 [INFO] Fold 161: starting GA(pop=20,gen=10)
+2025-07-24 10:03:18,958 [INFO] Fold 161: starting BO(n_calls=30)
+2025-07-24 10:03:25,839 [INFO] → Fold 161 done in 6.9s: p=5,q=5, RMSE=0.0150
+2025-07-24 10:03:25,860 [INFO] Fold 163: starting GA(pop=20,gen=10)
+2025-07-24 10:03:25,872 [INFO] Fold 163: starting BO(n_calls=30)
+2025-07-24 10:03:32,869 [INFO] → Fold 163 done in 7.0s: p=3,q=4, RMSE=0.0283
+2025-07-24 10:03:32,890 [INFO] Fold 171: starting GA(pop=20,gen=10)
+2025-07-24 10:03:32,901 [INFO] Fold 171: starting BO(n_calls=30)
+2025-07-24 10:03:40,177 [INFO] → Fold 171 done in 7.3s: p=5,q=1, RMSE=0.0130
+2025-07-24 10:03:40,198 [INFO] Fold 174: starting GA(pop=20,gen=10)
+2025-07-24 10:03:40,209 [INFO] Fold 174: starting BO(n_calls=30)
+2025-07-24 10:03:47,558 [INFO] → Fold 174 done in 7.4s: p=6,q=5, RMSE=0.0097
+2025-07-24 10:03:47,579 [INFO] Fold 182: starting GA(pop=20,gen=10)
+2025-07-24 10:03:47,590 [INFO] Fold 182: starting BO(n_calls=30)
+2025-07-24 10:03:54,032 [INFO] → Fold 182 done in 6.5s: p=7,q=6, RMSE=0.0107
+2025-07-24 10:03:54,054 [INFO] Fold 191: starting GA(pop=20,gen=10)
+2025-07-24 10:03:54,064 [INFO] Fold 191: starting BO(n_calls=30)
+2025-07-24 10:04:02,428 [INFO] → Fold 191 done in 8.4s: p=7,q=5, RMSE=0.0105
+2025-07-24 10:04:02,450 [INFO] Fold 192: starting GA(pop=20,gen=10)
+2025-07-24 10:04:02,461 [INFO] Fold 192: starting BO(n_calls=30)
+2025-07-24 10:04:09,477 [INFO] → Fold 192 done in 7.0s: p=1,q=1, RMSE=0.0132
+2025-07-24 10:04:09,499 [INFO] Fold 215: starting GA(pop=20,gen=10)
+2025-07-24 10:04:09,510 [INFO] Fold 215: starting BO(n_calls=30)
+2025-07-24 10:04:16,523 [INFO] → Fold 215 done in 7.0s: p=1,q=1, RMSE=0.0225
+2025-07-24 10:04:16,544 [INFO] Fold 229: starting GA(pop=20,gen=10)
+2025-07-24 10:04:16,555 [INFO] Fold 229: starting BO(n_calls=30)
+2025-07-24 10:04:22,572 [INFO] → Fold 229 done in 6.0s: p=7,q=4, RMSE=0.0111
+2025-07-24 10:04:22,594 [INFO] Fold 230: starting GA(pop=20,gen=10)
+2025-07-24 10:04:22,605 [INFO] Fold 230: starting BO(n_calls=30)
+2025-07-24 10:19:41,688 [INFO] Fold 52: starting GA(pop=20,gen=10)
+2025-07-24 10:19:41,708 [INFO] Fold 52: starting BO(n_calls=30)
+2025-07-24 10:19:49,153 [INFO] → Fold 52 done in 7.5s: p=2,q=5, RMSE=0.0158
+2025-07-24 10:19:49,175 [INFO] Fold 60: starting GA(pop=20,gen=10)
+2025-07-24 10:19:49,185 [INFO] Fold 60: starting BO(n_calls=30)
+2025-07-24 10:19:55,859 [INFO] → Fold 60 done in 6.7s: p=1,q=2, RMSE=0.0115
+2025-07-24 10:19:55,881 [INFO] Fold 72: starting GA(pop=20,gen=10)
+2025-07-24 10:19:55,892 [INFO] Fold 72: starting BO(n_calls=30)
+2025-07-24 10:20:03,129 [INFO] → Fold 72 done in 7.2s: p=7,q=3, RMSE=0.0062
+2025-07-24 10:20:03,150 [INFO] Fold 76: starting GA(pop=20,gen=10)
+2025-07-24 10:20:03,162 [INFO] Fold 76: starting BO(n_calls=30)
+2025-07-24 10:20:08,276 [INFO] → Fold 76 done in 5.1s: p=4,q=7, RMSE=0.0154
+2025-07-24 10:20:08,298 [INFO] Fold 90: starting GA(pop=20,gen=10)
+2025-07-24 10:20:08,309 [INFO] Fold 90: starting BO(n_calls=30)
+2025-07-24 10:20:15,995 [INFO] → Fold 90 done in 7.7s: p=2,q=2, RMSE=0.0105
+2025-07-24 10:20:16,018 [INFO] Fold 93: starting GA(pop=20,gen=10)
+2025-07-24 10:20:16,028 [INFO] Fold 93: starting BO(n_calls=30)
+2025-07-24 10:20:24,044 [INFO] → Fold 93 done in 8.0s: p=6,q=5, RMSE=0.0270
+2025-07-24 10:20:24,066 [INFO] Fold 102: starting GA(pop=20,gen=10)
+2025-07-24 10:20:24,079 [INFO] Fold 102: starting BO(n_calls=30)
+2025-07-24 10:20:31,376 [INFO] → Fold 102 done in 7.3s: p=2,q=2, RMSE=0.0157
+2025-07-24 10:20:31,397 [INFO] Fold 104: starting GA(pop=20,gen=10)
+2025-07-24 10:20:31,408 [INFO] Fold 104: starting BO(n_calls=30)
+2025-07-24 10:20:39,815 [INFO] → Fold 104 done in 8.4s: p=7,q=7, RMSE=0.0163
+2025-07-24 10:20:39,837 [INFO] Fold 113: starting GA(pop=20,gen=10)
+2025-07-24 10:20:39,849 [INFO] Fold 113: starting BO(n_calls=30)
+2025-07-24 10:20:47,933 [INFO] → Fold 113 done in 8.1s: p=2,q=1, RMSE=0.0255
+2025-07-24 10:20:47,955 [INFO] Fold 119: starting GA(pop=20,gen=10)
+2025-07-24 10:20:47,967 [INFO] Fold 119: starting BO(n_calls=30)
+2025-07-24 10:20:55,851 [INFO] → Fold 119 done in 7.9s: p=2,q=1, RMSE=0.0126
+2025-07-24 10:20:55,873 [INFO] Fold 150: starting GA(pop=20,gen=10)
+2025-07-24 10:20:55,885 [INFO] Fold 150: starting BO(n_calls=30)
+2025-07-24 10:21:02,737 [INFO] → Fold 150 done in 6.9s: p=1,q=3, RMSE=0.0251
+2025-07-24 10:21:02,759 [INFO] Fold 158: starting GA(pop=20,gen=10)
+2025-07-24 10:21:02,770 [INFO] Fold 158: starting BO(n_calls=30)
+2025-07-24 10:21:09,687 [INFO] → Fold 158 done in 6.9s: p=6,q=5, RMSE=0.0244
+2025-07-24 10:21:09,708 [INFO] Fold 161: starting GA(pop=20,gen=10)
+2025-07-24 10:21:09,719 [INFO] Fold 161: starting BO(n_calls=30)
+2025-07-24 10:21:16,774 [INFO] → Fold 161 done in 7.1s: p=2,q=1, RMSE=0.0153
+2025-07-24 10:21:16,796 [INFO] Fold 163: starting GA(pop=20,gen=10)
+2025-07-24 10:21:16,807 [INFO] Fold 163: starting BO(n_calls=30)
+2025-07-24 10:21:23,592 [INFO] → Fold 163 done in 6.8s: p=7,q=6, RMSE=0.0285
+2025-07-24 10:21:23,614 [INFO] Fold 171: starting GA(pop=20,gen=10)
+2025-07-24 10:21:23,625 [INFO] Fold 171: starting BO(n_calls=30)
+2025-07-24 10:21:32,173 [INFO] → Fold 171 done in 8.6s: p=5,q=2, RMSE=0.0130
+2025-07-24 10:21:32,196 [INFO] Fold 174: starting GA(pop=20,gen=10)
+2025-07-24 10:21:32,206 [INFO] Fold 174: starting BO(n_calls=30)
+2025-07-24 10:21:39,665 [INFO] → Fold 174 done in 7.5s: p=6,q=5, RMSE=0.0097
+2025-07-24 10:21:39,687 [INFO] Fold 182: starting GA(pop=20,gen=10)
+2025-07-24 10:21:39,698 [INFO] Fold 182: starting BO(n_calls=30)
+2025-07-24 10:21:46,772 [INFO] → Fold 182 done in 7.1s: p=3,q=2, RMSE=0.0107
+2025-07-24 10:21:46,795 [INFO] Fold 191: starting GA(pop=20,gen=10)
+2025-07-24 10:21:46,806 [INFO] Fold 191: starting BO(n_calls=30)
+2025-07-24 10:21:53,350 [INFO] → Fold 191 done in 6.6s: p=7,q=5, RMSE=0.0105
+2025-07-24 10:21:53,371 [INFO] Fold 192: starting GA(pop=20,gen=10)
+2025-07-24 10:21:53,382 [INFO] Fold 192: starting BO(n_calls=30)
+2025-07-24 10:22:00,901 [INFO] → Fold 192 done in 7.5s: p=1,q=1, RMSE=0.0132
+2025-07-24 10:22:00,924 [INFO] Fold 215: starting GA(pop=20,gen=10)
+2025-07-24 10:22:00,935 [INFO] Fold 215: starting BO(n_calls=30)
+2025-07-24 10:22:07,589 [INFO] → Fold 215 done in 6.7s: p=1,q=1, RMSE=0.0225
+2025-07-24 10:22:07,611 [INFO] Fold 229: starting GA(pop=20,gen=10)
+2025-07-24 10:22:07,622 [INFO] Fold 229: starting BO(n_calls=30)
+2025-07-24 10:22:14,214 [INFO] → Fold 229 done in 6.6s: p=7,q=4, RMSE=0.0111
+2025-07-24 10:22:14,237 [INFO] Fold 230: starting GA(pop=20,gen=10)
+2025-07-24 10:22:14,248 [INFO] Fold 230: starting BO(n_calls=30)
+2025-07-24 10:22:20,997 [INFO] → Fold 230 done in 6.8s: p=6,q=7, RMSE=0.0123
+2025-07-24 10:22:21,020 [INFO] Fold 248: starting GA(pop=20,gen=10)
+2025-07-24 10:22:21,031 [INFO] Fold 248: starting BO(n_calls=30)
+2025-07-24 10:22:27,334 [INFO] → Fold 248 done in 6.3s: p=5,q=6, RMSE=0.0101
+2025-07-24 10:22:27,357 [INFO] Fold 253: starting GA(pop=20,gen=10)
+2025-07-24 10:22:27,368 [INFO] Fold 253: starting BO(n_calls=30)
+2025-07-24 10:22:35,131 [INFO] → Fold 253 done in 7.8s: p=5,q=6, RMSE=0.0108
+2025-07-24 10:22:35,153 [INFO] Fold 268: starting GA(pop=20,gen=10)
+2025-07-24 10:22:35,165 [INFO] Fold 268: starting BO(n_calls=30)
+2025-07-24 10:22:42,594 [INFO] → Fold 268 done in 7.4s: p=4,q=4, RMSE=0.0162
+2025-07-24 10:22:42,614 [INFO] Fold 275: starting GA(pop=20,gen=10)
+2025-07-24 10:22:42,625 [INFO] Fold 275: starting BO(n_calls=30)
+2025-07-24 10:22:49,120 [INFO] → Fold 275 done in 6.5s: p=6,q=7, RMSE=0.0072
+2025-07-24 10:22:49,141 [INFO] Fold 281: starting GA(pop=20,gen=10)
+2025-07-24 10:22:49,152 [INFO] Fold 281: starting BO(n_calls=30)
+2025-07-24 10:22:56,828 [INFO] → Fold 281 done in 7.7s: p=7,q=5, RMSE=0.0092
+2025-07-24 10:22:56,849 [INFO] Fold 282: starting GA(pop=20,gen=10)
+2025-07-24 10:22:56,860 [INFO] Fold 282: starting BO(n_calls=30)
+2025-07-24 10:23:03,935 [INFO] → Fold 282 done in 7.1s: p=7,q=5, RMSE=0.0093
+2025-07-24 10:23:03,957 [INFO] Fold 288: starting GA(pop=20,gen=10)
+2025-07-24 10:23:03,968 [INFO] Fold 288: starting BO(n_calls=30)
+2025-07-24 10:23:09,604 [INFO] → Fold 288 done in 5.6s: p=4,q=2, RMSE=0.0095
+2025-07-24 10:23:09,626 [INFO] Fold 291: starting GA(pop=20,gen=10)
+2025-07-24 10:23:09,637 [INFO] Fold 291: starting BO(n_calls=30)
+2025-07-24 10:23:15,244 [INFO] → Fold 291 done in 5.6s: p=6,q=5, RMSE=0.0198
+2025-07-24 10:23:15,265 [INFO] Fold 292: starting GA(pop=20,gen=10)
+2025-07-24 10:23:15,276 [INFO] Fold 292: starting BO(n_calls=30)
+2025-07-24 10:23:22,473 [INFO] → Fold 292 done in 7.2s: p=7,q=7, RMSE=0.0225
+2025-07-24 10:23:22,495 [INFO] Fold 311: starting GA(pop=20,gen=10)
+2025-07-24 10:23:22,506 [INFO] Fold 311: starting BO(n_calls=30)
+2025-07-24 10:23:30,064 [INFO] → Fold 311 done in 7.6s: p=7,q=6, RMSE=0.0104
+2025-07-24 10:23:30,086 [INFO] Fold 317: starting GA(pop=20,gen=10)
+2025-07-24 10:23:30,097 [INFO] Fold 317: starting BO(n_calls=30)
+2025-07-24 10:23:37,133 [INFO] → Fold 317 done in 7.0s: p=2,q=2, RMSE=0.0226
+2025-07-24 10:23:37,154 [INFO] Fold 321: starting GA(pop=20,gen=10)
+2025-07-24 10:23:37,165 [INFO] Fold 321: starting BO(n_calls=30)
+2025-07-24 10:23:44,561 [INFO] → Fold 321 done in 7.4s: p=6,q=3, RMSE=0.0293
+2025-07-24 10:23:44,582 [INFO] Fold 322: starting GA(pop=20,gen=10)
+2025-07-24 10:23:44,592 [INFO] Fold 322: starting BO(n_calls=30)
+2025-07-24 10:23:52,554 [INFO] → Fold 322 done in 8.0s: p=4,q=4, RMSE=0.0216
+2025-07-24 10:23:52,576 [INFO] Fold 325: starting GA(pop=20,gen=10)
+2025-07-24 10:23:52,586 [INFO] Fold 325: starting BO(n_calls=30)
+2025-07-24 10:23:59,776 [INFO] → Fold 325 done in 7.2s: p=6,q=6, RMSE=0.0167
+2025-07-24 10:23:59,798 [INFO] Fold 343: starting GA(pop=20,gen=10)
+2025-07-24 10:23:59,810 [INFO] Fold 343: starting BO(n_calls=30)
+2025-07-24 10:24:05,531 [INFO] → Fold 343 done in 5.7s: p=1,q=1, RMSE=0.0282
+2025-07-24 10:24:05,552 [INFO] Fold 353: starting GA(pop=20,gen=10)
+2025-07-24 10:24:05,563 [INFO] Fold 353: starting BO(n_calls=30)
+2025-07-24 10:24:12,083 [INFO] → Fold 353 done in 6.5s: p=2,q=2, RMSE=0.0117
+2025-07-24 10:24:12,105 [INFO] Fold 358: starting GA(pop=20,gen=10)
+2025-07-24 10:24:12,116 [INFO] Fold 358: starting BO(n_calls=30)
+2025-07-24 10:24:19,801 [INFO] → Fold 358 done in 7.7s: p=7,q=7, RMSE=0.0133
+2025-07-24 10:24:19,823 [INFO] Fold 366: starting GA(pop=20,gen=10)
+2025-07-24 10:24:19,833 [INFO] Fold 366: starting BO(n_calls=30)
+2025-07-24 10:24:25,958 [INFO] → Fold 366 done in 6.1s: p=3,q=3, RMSE=0.0184
+2025-07-24 10:24:25,980 [INFO] Fold 373: starting GA(pop=20,gen=10)
+2025-07-24 10:24:25,991 [INFO] Fold 373: starting BO(n_calls=30)
+2025-07-24 10:24:31,791 [INFO] → Fold 373 done in 5.8s: p=7,q=6, RMSE=0.0356
+2025-07-24 10:24:31,812 [INFO] Fold 408: starting GA(pop=20,gen=10)
+2025-07-24 10:24:31,823 [INFO] Fold 408: starting BO(n_calls=30)
+2025-07-24 10:24:38,377 [INFO] → Fold 408 done in 6.6s: p=6,q=6, RMSE=0.0137
+2025-07-24 10:24:38,400 [INFO] Fold 433: starting GA(pop=20,gen=10)
+2025-07-24 10:24:38,411 [INFO] Fold 433: starting BO(n_calls=30)
+2025-07-24 10:24:45,359 [INFO] → Fold 433 done in 7.0s: p=4,q=7, RMSE=0.0109
+2025-07-24 10:24:45,380 [INFO] Fold 455: starting GA(pop=20,gen=10)
+2025-07-24 10:24:45,390 [INFO] Fold 455: starting BO(n_calls=30)
+2025-07-24 10:24:52,175 [INFO] → Fold 455 done in 6.8s: p=7,q=7, RMSE=0.0108
+2025-07-24 10:24:52,197 [INFO] Fold 461: starting GA(pop=20,gen=10)
+2025-07-24 10:24:52,209 [INFO] Fold 461: starting BO(n_calls=30)
+2025-07-24 10:24:58,501 [INFO] → Fold 461 done in 6.3s: p=4,q=7, RMSE=0.0059
+2025-07-24 10:24:58,524 [INFO] Fold 479: starting GA(pop=20,gen=10)
+2025-07-24 10:24:58,534 [INFO] Fold 479: starting BO(n_calls=30)
+2025-07-24 10:25:05,884 [INFO] → Fold 479 done in 7.4s: p=7,q=7, RMSE=0.0189
+2025-07-24 10:25:05,906 [INFO] Fold 486: starting GA(pop=20,gen=10)
+2025-07-24 10:25:05,916 [INFO] Fold 486: starting BO(n_calls=30)
+2025-07-24 10:25:12,366 [INFO] → Fold 486 done in 6.5s: p=1,q=1, RMSE=0.0127
+2025-07-24 10:25:12,389 [INFO] Fold 492: starting GA(pop=20,gen=10)
+2025-07-24 10:25:12,400 [INFO] Fold 492: starting BO(n_calls=30)
+2025-07-24 10:25:18,168 [INFO] → Fold 492 done in 5.8s: p=6,q=3, RMSE=0.0084
+2025-07-24 10:25:18,210 [INFO] Fold 493: starting GA(pop=20,gen=10)
+2025-07-24 10:25:18,221 [INFO] Fold 493: starting BO(n_calls=30)
+2025-07-24 10:25:23,438 [INFO] → Fold 493 done in 5.2s: p=4,q=3, RMSE=0.0062
+2025-07-24 10:25:23,461 [INFO] Fold 506: starting GA(pop=20,gen=10)
+2025-07-24 10:25:23,472 [INFO] Fold 506: starting BO(n_calls=30)
+2025-07-24 10:25:28,534 [INFO] → Fold 506 done in 5.1s: p=4,q=3, RMSE=0.0028
+2025-07-24 10:25:28,556 [INFO] Fold 507: starting GA(pop=20,gen=10)
+2025-07-24 10:25:28,567 [INFO] Fold 507: starting BO(n_calls=30)
+2025-07-24 10:25:34,375 [INFO] → Fold 507 done in 5.8s: p=1,q=5, RMSE=0.0024
+2025-07-24 10:25:34,397 [INFO] Fold 508: starting GA(pop=20,gen=10)
+2025-07-24 10:25:34,408 [INFO] Fold 508: starting BO(n_calls=30)
+2025-07-24 10:25:40,757 [INFO] → Fold 508 done in 6.4s: p=7,q=6, RMSE=0.0029
+2025-07-24 10:25:40,780 [INFO] Fold 517: starting GA(pop=20,gen=10)
+2025-07-24 10:25:40,791 [INFO] Fold 517: starting BO(n_calls=30)
+2025-07-24 10:25:47,228 [INFO] → Fold 517 done in 6.4s: p=7,q=5, RMSE=0.0011
+2025-07-24 10:25:47,249 [INFO] Fold 518: starting GA(pop=20,gen=10)
+2025-07-24 10:25:47,260 [INFO] Fold 518: starting BO(n_calls=30)
+2025-07-24 10:25:53,738 [INFO] → Fold 518 done in 6.5s: p=5,q=7, RMSE=0.0038
+2025-07-24 10:25:53,759 [INFO] Fold 520: starting GA(pop=20,gen=10)
+2025-07-24 10:25:53,771 [INFO] Fold 520: starting BO(n_calls=30)
+2025-07-24 10:26:01,106 [INFO] → Fold 520 done in 7.3s: p=4,q=2, RMSE=0.0011
+2025-07-24 10:26:01,128 [INFO] Fold 524: starting GA(pop=20,gen=10)
+2025-07-24 10:26:01,139 [INFO] Fold 524: starting BO(n_calls=30)
+2025-07-24 10:26:07,920 [INFO] → Fold 524 done in 6.8s: p=3,q=7, RMSE=0.0010
+2025-07-24 10:26:07,940 [INFO] Fold 534: starting GA(pop=20,gen=10)
+2025-07-24 10:26:07,951 [INFO] Fold 534: starting BO(n_calls=30)
+2025-07-24 10:26:15,317 [INFO] → Fold 534 done in 7.4s: p=4,q=2, RMSE=0.0015
+2025-07-24 10:26:15,338 [INFO] Fold 535: starting GA(pop=20,gen=10)
+2025-07-24 10:26:15,349 [INFO] Fold 535: starting BO(n_calls=30)
+2025-07-24 10:26:23,049 [INFO] → Fold 535 done in 7.7s: p=5,q=2, RMSE=0.0029
+2025-07-24 10:26:23,070 [INFO] Fold 546: starting GA(pop=20,gen=10)
+2025-07-24 10:26:23,080 [INFO] Fold 546: starting BO(n_calls=30)
+2025-07-24 10:26:30,640 [INFO] → Fold 546 done in 7.6s: p=2,q=2, RMSE=0.0033
+2025-07-24 10:26:30,661 [INFO] Fold 557: starting GA(pop=20,gen=10)
+2025-07-24 10:26:30,671 [INFO] Fold 557: starting BO(n_calls=30)
+2025-07-24 10:26:37,902 [INFO] → Fold 557 done in 7.2s: p=1,q=7, RMSE=0.0157
+2025-07-24 10:26:37,923 [INFO] Fold 590: starting GA(pop=20,gen=10)
+2025-07-24 10:26:37,934 [INFO] Fold 590: starting BO(n_calls=30)
+2025-07-24 10:26:45,073 [INFO] → Fold 590 done in 7.1s: p=4,q=3, RMSE=0.0207
+2025-07-24 10:26:45,094 [INFO] Fold 595: starting GA(pop=20,gen=10)
+2025-07-24 10:26:45,105 [INFO] Fold 595: starting BO(n_calls=30)
+2025-07-24 10:26:52,738 [INFO] → Fold 595 done in 7.6s: p=1,q=4, RMSE=0.0207
+2025-07-24 10:26:52,760 [INFO] Fold 601: starting GA(pop=20,gen=10)
+2025-07-24 10:26:52,770 [INFO] Fold 601: starting BO(n_calls=30)
+2025-07-24 10:27:00,645 [INFO] → Fold 601 done in 7.9s: p=7,q=5, RMSE=0.0448
+2025-07-24 10:27:00,667 [INFO] Fold 616: starting GA(pop=20,gen=10)
+2025-07-24 10:27:00,677 [INFO] Fold 616: starting BO(n_calls=30)
+2025-07-24 10:27:07,480 [INFO] → Fold 616 done in 6.8s: p=2,q=2, RMSE=0.0523
+2025-07-24 10:27:07,502 [INFO] Fold 617: starting GA(pop=20,gen=10)
+2025-07-24 10:27:07,513 [INFO] Fold 617: starting BO(n_calls=30)
+2025-07-24 10:27:15,106 [INFO] → Fold 617 done in 7.6s: p=7,q=7, RMSE=0.0521
+2025-07-24 10:27:15,128 [INFO] Fold 632: starting GA(pop=20,gen=10)
+2025-07-24 10:27:15,139 [INFO] Fold 632: starting BO(n_calls=30)
+2025-07-24 10:27:23,136 [INFO] → Fold 632 done in 8.0s: p=6,q=2, RMSE=0.0247
+2025-07-24 10:27:23,158 [INFO] Fold 633: starting GA(pop=20,gen=10)
+2025-07-24 10:27:23,170 [INFO] Fold 633: starting BO(n_calls=30)
+2025-07-24 10:27:29,902 [INFO] → Fold 633 done in 6.7s: p=7,q=5, RMSE=0.0288
+2025-07-24 10:27:29,924 [INFO] Fold 634: starting GA(pop=20,gen=10)
+2025-07-24 10:27:29,934 [INFO] Fold 634: starting BO(n_calls=30)
+2025-07-24 10:27:37,225 [INFO] → Fold 634 done in 7.3s: p=6,q=2, RMSE=0.0254
+2025-07-24 10:27:37,247 [INFO] Fold 647: starting GA(pop=20,gen=10)
+2025-07-24 10:27:37,257 [INFO] Fold 647: starting BO(n_calls=30)
+2025-07-24 10:27:44,217 [INFO] → Fold 647 done in 7.0s: p=3,q=6, RMSE=0.0217
+2025-07-24 10:27:44,239 [INFO] Fold 648: starting GA(pop=20,gen=10)
+2025-07-24 10:27:44,250 [INFO] Fold 648: starting BO(n_calls=30)
+2025-07-24 10:27:52,136 [INFO] → Fold 648 done in 7.9s: p=2,q=1, RMSE=0.0237
+2025-07-24 10:27:52,158 [INFO] Fold 650: starting GA(pop=20,gen=10)
+2025-07-24 10:27:52,170 [INFO] Fold 650: starting BO(n_calls=30)
+2025-07-24 10:28:00,413 [INFO] → Fold 650 done in 8.3s: p=7,q=5, RMSE=0.0349
+2025-07-24 10:28:00,434 [INFO] Fold 654: starting GA(pop=20,gen=10)
+2025-07-24 10:28:00,444 [INFO] Fold 654: starting BO(n_calls=30)
+2025-07-24 10:28:08,274 [INFO] → Fold 654 done in 7.8s: p=7,q=7, RMSE=0.0259
+2025-07-24 10:28:08,296 [INFO] Fold 675: starting GA(pop=20,gen=10)
+2025-07-24 10:28:08,306 [INFO] Fold 675: starting BO(n_calls=30)
+2025-07-24 10:28:15,886 [INFO] → Fold 675 done in 7.6s: p=7,q=5, RMSE=0.0320
+2025-07-24 10:28:15,908 [INFO] Fold 676: starting GA(pop=20,gen=10)
+2025-07-24 10:28:15,919 [INFO] Fold 676: starting BO(n_calls=30)
+2025-07-24 10:28:22,817 [INFO] → Fold 676 done in 6.9s: p=4,q=3, RMSE=0.0308
+2025-07-24 10:28:22,840 [INFO] Fold 687: starting GA(pop=20,gen=10)
+2025-07-24 10:28:22,851 [INFO] Fold 687: starting BO(n_calls=30)
+2025-07-24 10:28:29,723 [INFO] → Fold 687 done in 6.9s: p=5,q=5, RMSE=0.0296
+2025-07-24 10:28:29,742 [INFO] === Tier-1 ARIMA complete ===
