@@ -3,38 +3,27 @@ import os
 import json
 import argparse
 import logging
-import gc
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from math import sqrt
 from sklearn.metrics import mean_squared_error
-from statsmodels.tsa.arima.model import ARIMA
 
+from statsmodels.tsa.arima.model import ARIMA
 from skopt import gp_minimize
 from skopt.space import Integer
 from pymoo.algorithms.soo.nonconvex.ga import GA
-from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize as pymoo_minimize
 from pymoo.core.problem import ElementwiseProblem
-from pymoo.core.sampling import Sampling
 
 # ─── CONFIG & LOGGING ─────────────────────────────────────
 LOG_DIR = "logs"
-DEFAULT_T2_NGEN = 20
-BASE_COST = 0.0005
-SLIPPAGE  = 0.0001
+GA_POP_SIZE = 35
+GA_N_GEN = 25
+BO_N_CALLS = 50
+TOP_N_SEEDS = 5
 
 # ─── HELPERS ─────────────────────────────────────────
-def get_params_for_volatility(category: str):
-    category = category.lower()
-    # ga_pop, ga_gen, bo_calls, top_n seeds
-    return {
-        'low': (20, 10, 30, 3),
-        'medium': (30, 15, 40, 5),
-        'high': (40, 25, 50, 7)
-    }.get(category, (30, 15, 40, 5))
-
 def arima_rmse(params, train, val):
     p, q = map(int, params)
     try:
@@ -67,19 +56,17 @@ def create_periodic_arima_objective(train, val, retrain_interval=20, cost=0.0005
     """
     def objective(x):
         p, q, rel_thresh = int(x[0]), int(x[1]), float(x[2])
-        # thresh_rel must be in (0,1)
         if not (0.0 < rel_thresh < 1.0):
             return 1e3, 1e3
 
         history = train.copy()
         all_returns = []
-
         n = len(val)
+
         # step through val in blocks of retrain_interval
         for start in range(0, n, retrain_interval):
             end = min(start + retrain_interval, n)
             try:
-                # refit on all historical data so far
                 model = ARIMA(history, order=(p, 0, q)).fit()
             except Exception as e:
                 logging.warning(f"ARIMA fit error p={p},q={q}: {e}")
@@ -87,7 +74,6 @@ def create_periodic_arima_objective(train, val, retrain_interval=20, cost=0.0005
 
             h = end - start
             forecast = model.forecast(steps=h)
-
             threshold_value = np.quantile(forecast, rel_thresh)
             signals = (forecast > threshold_value).astype(int)
             if signals.sum() == 0:
@@ -95,13 +81,10 @@ def create_periodic_arima_objective(train, val, retrain_interval=20, cost=0.0005
             
             block_returns = val[start:end] * signals - cost * signals
             all_returns.append(block_returns)
-            
             history = np.concatenate([history, val[start:end]])
 
         net_returns = np.concatenate(all_returns)
-        sr  = sharpe_ratio(net_returns)
-        mdd = max_drawdown(net_returns)
-        return -sr, mdd
+        return -sharpe_ratio(net_returns), max_drawdown(net_returns)
         
     return objective
 
@@ -168,11 +151,8 @@ def main():
     # Load fold metadata
     folds_summary = os.path.join(args.data_dir, 'folds_summary.json')
     summary = {f['global_fold_id']: f for f in json.load(open(folds_summary))}
-    reps_path = os.path.join(args.data_dir, 'shared_meta/representative_fold_ids.json')
-    reps = json.load(open(reps_path))
-    vol_df = pd.read_csv(os.path.join(args.data_dir,
-                                      'shared_meta/fold_volatility_categorized.csv'))
-    vol_map = dict(zip(vol_df['global_fold_id'], vol_df['volatility_category']))
+    arima_reps_path = os.path.join(args.data_dir, 'arima', 'arima_tuning_folds.json')
+    reps = [r['fold_id'] for r in json.load(open(arima_reps_path))]
 
     if args.phase == 1:
         # --- Tier 1: GA -> BO to find best (p,q) by RMSE ---
@@ -202,38 +182,28 @@ def main():
                 parse_dates=['Date']
             )
             train_ret = train['Log_Returns'].dropna().values
-            val_ret   = val['Log_Returns'].values
+            val_ret = val['Log_Returns'].values
 
-            category = vol_map.get(fid, "medium")
-            ga_pop, ga_gen, bo_calls, top_n = get_params_for_volatility(category)
-            logging.info(f"Fold {fid}: Volatility={category}, GA(pop={ga_pop}, gen={ga_gen}), BO(calls={bo_calls})")
+            logging.info(f"Fold {fid}: GA(pop={GA_POP_SIZE}, gen={GA_N_GEN}), BO(calls={BO_N_CALLS})")
 
-            # GA global search with history capture 
-            algorithm = GA(pop_size=ga_pop,
+            # GA global search
+            algorithm = GA(pop_size=GA_POP_SIZE,
                            eliminate_duplicates=True,
                            save_history=True)
             
             res_ga = pymoo_minimize(
                 Tier1ARIMAProblem(train_ret, val_ret),
                 algorithm,
-                ('n_gen', ga_gen),
+                ('n_gen', GA_N_GEN),
                 verbose=False,
                 return_algorithm=True
             )
             algorithm = res_ga.algorithm
+
             logging.info(f"Collected {len(algorithm.history)} generations in GA history")
 
-            # collect the best (p,q,rmse) from each generation
-            history_best = []
-            for pop in algorithm.history:
-                best = min(pop, key=lambda ind: ind.F[0])
-                history_best.append((int(best.X[0]), int(best.X[1]), float(best.F[0])))
-            
-            if not history_best:
-                raise RuntimeError("GA history was empty—did you pass return_algorithm=True?")
-
-            # pick top_n unique seeds from history
-            all_individuals = [ind for pop in algorithm.history for ind in pop] 
+            # Pick top seeds from GA
+            all_individuals = [ind for pop in algorithm.history for ind in pop]
             seen = set()
             unique_seeds = []
             for ind in all_individuals:
@@ -243,16 +213,15 @@ def main():
                     unique_seeds.append(ind)
 
             unique_seeds.sort(key=lambda ind: ind.F[0])
-            top_seeds_for_bo = unique_seeds[:top_n]
-
+            top_seeds_for_bo = unique_seeds[:TOP_N_SEEDS]
             x0 = [[int(ind.X[0]), int(ind.X[1])] for ind in top_seeds_for_bo]
             y0 = [ind.F[0] for ind in top_seeds_for_bo]
 
-            # BO local refinement
+            # BO refinement
             res_bo = gp_minimize(
                 lambda x: arima_rmse(x, train_ret, val_ret),
                 dimensions=[Integer(1, 7), Integer(1, 7)],
-                n_calls=bo_calls,
+                n_calls=BO_N_CALLS,
                 x0=x0,
                 y0=y0,
                 random_state=42
@@ -260,7 +229,6 @@ def main():
 
             best_p, best_q = map(int, res_bo.x)
 
-            # record unique seeds in top_ga
             top_ga = [{'p': p, 'q': q} for p, q, _ in unique_seeds]
             results.append({'fold_id': fid,
                             'best_params': {'p': best_p, 'd': 0, 'q': best_q},
@@ -295,8 +263,8 @@ def main():
         for fid in tqdm(pending, desc='Tier2 ARIMA MOGA'):
             params = champions[fid]
             info = summary[fid]
-            train = pd.read_csv(os.path.join(args.data_dir, info['train_path_arima_prophet']))
-            val = pd.read_csv(os.path.join(args.data_dir, info['val_path_arima_prophet']))
+            train = pd.read_csv(os.path.join(args.data_dir, info['train_path_arima']))
+            val = pd.read_csv(os.path.join(args.data_dir, info['val_path_arima']))
             train_ret = train['Log_Returns'].dropna().values
             val_ret = val['Log_Returns'].values
             

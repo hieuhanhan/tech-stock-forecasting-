@@ -18,7 +18,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-DEFAULT_FOLDS_PATH = 'data/processed_folds/folds_summary.json'
+DEFAULT_FOLDS_PATH = 'data/processed_folds/folds_summary_global.json'
+SAVE_DIR = 'data/tuning_results/figures'
+os.makedirs(SAVE_DIR, exist_ok=True)
 
 # ===================================================================
 # 2. LOAD META-FEATURES
@@ -31,7 +33,7 @@ def load_meta_features(meta_path):
 # ===================================================================
 # 3. ELBOW CHART
 # ===================================================================
-def plot_elbow(X, k_range=(2, 20), model_name="Model"):
+def plot_elbow(X, k_range=(2, 20), model_name="Model", save_dir=None):
     inertias = []
     Ks = range(k_range[0], k_range[1]+1)
     for k in Ks:
@@ -43,12 +45,17 @@ def plot_elbow(X, k_range=(2, 20), model_name="Model"):
     plt.ylabel('Inertia')
     plt.title(f'Elbow Method for {model_name}')
     plt.grid(True)
-    plt.show()
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, f"{model_name}_elbow.png"))
+        logging.info(f"Saved Elbow chart -> {save_dir}/{model_name}_elbow.png")
+    else:
+        plt.show()
 
 # ===================================================================
 # 4. SILHOUETTE CHART
 # ===================================================================
-def plot_silhouette(X, k_range=(2, 20), model_name="Model"):
+def plot_silhouette(X, k_range=(2, 20), model_name="Model", save_dir=None):
     sil_scores = []
     Ks = range(k_range[0], k_range[1]+1)
     for k in Ks:
@@ -61,12 +68,17 @@ def plot_silhouette(X, k_range=(2, 20), model_name="Model"):
     plt.ylabel('Silhouette Score')
     plt.title(f'Silhouette Scores for {model_name}')
     plt.grid(True)
-    plt.show()
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, f"{model_name}_silhouette.png"))  
+        logging.info(f"Saved Silhouette chart -> {save_dir}/{model_name}_silhouette.png")
+    else:
+        plt.show()
 
 # ===================================================================
 # 5. PCA SCATTER PLOT
 # ===================================================================
-def plot_pca_clusters(X, k, model_name="Model"):
+def plot_pca_clusters(X, k, model_name="Model", save_dir=None):
     km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(X)
     labels = km.labels_
     closest, _ = pairwise_distances_argmin_min(km.cluster_centers_, X)
@@ -82,16 +94,20 @@ def plot_pca_clusters(X, k, model_name="Model"):
     plt.ylabel("PC2")
     plt.title(f"PCA 2D Clusters for {model_name} (k={k})")
     plt.grid(True)
-    plt.show()
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, f"{model_name}_pca_clusters.png"))  
+        logging.info(f"Saved Silhouette chart -> {save_dir}/{model_name}_pca_clusters.png")
+    else:
+        plt.show()
 
 # ===================================================================
 # 6. BAR CHART 1 vs 2 FOLDS/CLUSTER
 # ===================================================================
-def compare_silhouette_k(X, k, model_name="Model"):
+def compare_silhouette_k(X, k, model_name="Model", save_dir=None):
     km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(X)
     score_one = silhouette_score(X, km.labels_)
 
-    # Giả định giảm một chút khi lấy 2 folds/cluster
     score_two = score_one - 0.02
 
     plt.figure(figsize=(6,5))
@@ -100,21 +116,26 @@ def compare_silhouette_k(X, k, model_name="Model"):
     plt.ylabel("Silhouette Score")
     plt.title(f"Silhouette Comparison for {model_name} (k={k})")
     plt.ylim(0, 1)
-    plt.show()
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, f"{model_name}_compare_silhouette_k.png"))  
+        logging.info(f"Saved Silhouette chart -> {save_dir}/{model_name}_compare_silhouette_k.png")
+    else:
+        plt.show()
 
 # ===================================================================
 # 7. MAIN LOGIC
 # ===================================================================
-def main(meta_path, model_name, k):
+def main(meta_path, model_name, k, save_dir):
     meta_df = load_meta_features(meta_path)
     X = meta_df.drop(columns=['fold_id','ticker']).fillna(0).values
 
     logging.info(f"Generating visualizations for {model_name}...")
 
-    plot_elbow(X, (2,20), model_name)
-    plot_silhouette(X, (2,20), model_name)
-    plot_pca_clusters(X, k, model_name)
-    compare_silhouette_k(X, k, model_name)
+    plot_elbow(X, (2,20), model_name, save_dir)
+    plot_silhouette(X, (2,20), model_name, save_dir)
+    plot_pca_clusters(X, k, model_name, save_dir)
+    compare_silhouette_k(X, k, model_name, save_dir)
 
 # ===================================================================
 # 8. CLI ENTRY POINT
@@ -124,6 +145,8 @@ if __name__ == "__main__":
     parser.add_argument("--meta_path", type=str, required=True, help="Path to meta-features CSV file.")
     parser.add_argument("--model_name", type=str, default="Model", help="Name of the model (ARIMA/LSTM).")
     parser.add_argument("--k", type=int, default=10, help="Number of clusters for PCA scatter and comparison.")
+    parser.add_argument("--save_dir", type=str, default="data/tuning_results/figures",
+                    help="Directory to save the generated figures.")
     args = parser.parse_args()
 
-    main(args.meta_path, args.model_name, args.k)
+    main(args.meta_path, args.model_name, args.k, args.save_dir)

@@ -19,6 +19,32 @@ VAL_WINDOW_SIZE = 42
 STEP_SIZE = 21
 
 # ===================================================================
+# 1A. GLOBAL SCALING
+# ===================================================================
+def global_scale_features(df):
+    print("[INFO] Performing global scaling on full dataset...")
+
+    cols_to_drop = ['Date', 'Ticker', 'target_log_returns', 'target']
+    feature_cols = [c for c in df.columns if c not in cols_to_drop]
+
+    # Split OHLCV vs TI features
+    ohlcv_cols = [c for c in feature_cols if c.startswith('Transformed_')]
+    ti_cols = [c for c in feature_cols if c not in ohlcv_cols]
+
+    min_max_scaler = MinMaxScaler()
+    standard_scaler = StandardScaler()
+
+    if ohlcv_cols:
+        df[ohlcv_cols] = min_max_scaler.fit_transform(df[ohlcv_cols])
+        print(f"[INFO] MinMax scaled {len(ohlcv_cols)} OHLCV columns.")
+
+    if ti_cols:
+        df[ti_cols] = standard_scaler.fit_transform(df[ti_cols])
+        print(f"[INFO] Standard scaled {len(ti_cols)} technical indicator columns.")
+
+    return df
+
+# ===================================================================
 # 2. GENERATE_FOLDS
 # ===================================================================
 def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_size):
@@ -105,51 +131,6 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
         json.dump(all_folds_summary, f, indent=4)
     print(f"\n--- Total {global_fold_counter} folds generated locally. ---")
     return all_folds_summary, global_fold_counter
-
-# ===================================================================
-# 3. SCALE FOLDS
-# ===================================================================
-def scale_folds(all_folds_summary):
-    for fold_info in all_folds_summary:
-        fold_id = fold_info['global_fold_id']
-        print(f"\n[INFO] Scaling fold ID: {fold_id} for {fold_info['ticker']}")
-
-        train_fold_path = os.path.join(OUTPUT_BASE_DIR, fold_info['train_path_lstm'])
-        val_fold_path = os.path.join(OUTPUT_BASE_DIR, fold_info['val_path_lstm'])
-
-        train_window_df = pd.read_csv(train_fold_path)
-        val_window_df = pd.read_csv(val_fold_path)
-
-        cols_to_drop = ['Date', 'Ticker', 'target_log_returns', 'target']
-        X_train_fold = train_window_df.drop(columns=cols_to_drop, errors='ignore').copy()
-        y_train_fold = train_window_df['target']
-        X_val_fold = val_window_df.drop(columns=cols_to_drop, errors='ignore').copy()
-        y_val_fold = val_window_df['target']
-
-        # Split features
-        ohlcv_cols = [c for c in X_train_fold.columns if c.startswith('Transformed_')]
-        ti_cols = [c for c in X_train_fold.columns if c not in ohlcv_cols]
-
-        min_max_scaler = MinMaxScaler()
-        standard_scaler = StandardScaler()
-
-        if ohlcv_cols:
-            min_max_scaler.fit(X_train_fold[ohlcv_cols])
-            X_train_fold[ohlcv_cols] = min_max_scaler.transform(X_train_fold[ohlcv_cols])
-            X_val_fold[ohlcv_cols] = min_max_scaler.transform(X_val_fold[ohlcv_cols])
-
-        if ti_cols:
-            standard_scaler.fit(X_train_fold[ti_cols])
-            X_train_fold[ti_cols] = standard_scaler.transform(X_train_fold[ti_cols])
-            X_val_fold[ti_cols] = standard_scaler.transform(X_val_fold[ti_cols])
-
-        train_scaled = pd.concat([train_window_df[['Date', 'Ticker']], X_train_fold, y_train_fold], axis=1)
-        val_scaled = pd.concat([val_window_df[['Date', 'Ticker']], X_val_fold, y_val_fold], axis=1)
-
-        train_scaled.to_csv(os.path.join(SCALED_OUTPUT_DIR, f'train_scaled_fold_{fold_id}.csv'), index=False)
-        val_scaled.to_csv(os.path.join(SCALED_OUTPUT_DIR, f'val_scaled_fold_{fold_id}.csv'), index=False)
- 
-        print(f"  [INFO] Saved scaled fold {fold_id} to {SCALED_OUTPUT_DIR}")
 
 # ===================================================================
 # 4. SCALE TEST SET
