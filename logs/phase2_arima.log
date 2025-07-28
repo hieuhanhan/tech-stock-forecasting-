@@ -1,0 +1,125 @@
+2025-07-28 10:00:15,280 [INFO] Running sensitivity analysis for retrain_intervals=[5, 10, 20, 42]
+2025-07-28 10:01:58,735 [INFO] Running sensitivity analysis for retrain_intervals=[5, 10, 20, 42]
+2025-07-28 10:01:58,760 [INFO] Fold 18, Retrain Interval 5
+2025-07-28 10:13:50,355 [INFO] Fold 18, Retrain Interval 10
+2025-07-28 10:16:35,049 [INFO] Fold 18, Retrain Interval 20
+2025-07-28 10:18:53,087 [INFO] Fold 18, Retrain Interval 42
+2025-07-28 10:20:06,422 [INFO] Fold 309, Retrain Interval 5
+2025-07-28 11:04:59,639 [INFO] Fold 309, Retrain Interval 10
+2025-07-28 11:15:48,428 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-07-28 11:15:48,442 [INFO] Fold 18, Retrain Interval 10
+2025-07-28 11:16:47,461 [INFO] Fold 18, Retrain Interval 20
+2025-07-28 11:22:47,127 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-07-28 11:22:47,140 [INFO] Fold 18, Retrain Interval 10
+2025-07-28 11:23:41,210 [INFO] Fold 18, Retrain Interval 20
+2025-07-28 11:24:33,092 [INFO] Fold 18, Retrain Interval 42
+2025-07-28 11:24:53,606 [INFO] Checkpoint saved for fold 18
+2025-07-28 11:24:53,607 [INFO] Fold 309, Retrain Interval 10
+2025-07-28 11:27:55,115 [INFO] Fold 309, Retrain Interval 20
+2025-07-28 11:30:03,179 [INFO] Fold 309, Retrain Interval 42
+2025-07-28 11:30:42,668 [INFO] Checkpoint saved for fold 309
+2025-07-28 11:30:42,670 [INFO] Fold 65, Retrain Interval 10
+2025-07-28 11:32:03,408 [INFO] Fold 65, Retrain Interval 20
+2025-07-28 11:33:03,061 [INFO] Fold 65, Retrain Interval 42
+2025-07-28 11:33:35,884 [INFO] Checkpoint saved for fold 65
+2025-07-28 11:33:35,886 [INFO] Fold 671, Retrain Interval 10
+2025-07-28 11:34:46,706 [INFO] Fold 671, Retrain Interval 20
+2025-07-28 11:35:39,480 [INFO] Fold 671, Retrain Interval 42
+2025-07-28 11:36:13,163 [INFO] Checkpoint saved for fold 671
+2025-07-28 11:36:13,165 [INFO] Fold 34, Retrain Interval 10
+2025-07-28 11:40:34,047 [INFO] Fold 34, Retrain Interval 20
+2025-07-28 11:42:32,771 [INFO] Fold 34, Retrain Interval 42
+2025-07-28 11:42:48,238 [INFO] Checkpoint saved for fold 34
+2025-07-28 11:42:48,240 [INFO] Fold 137, Retrain Interval 10
+2025-07-28 11:43:56,456 [INFO] Fold 137, Retrain Interval 20
+2025-07-28 11:44:37,802 [INFO] Fold 137, Retrain Interval 42
+2025-07-28 11:44:51,969 [INFO] Checkpoint saved for fold 137
+2025-07-28 11:44:51,972 [INFO] Fold 416, Retrain Interval 10
+2025-07-28 11:48:58,737 [INFO] Fold 416, Retrain Interval 20
+2025-07-28 11:50:38,234 [INFO] Fold 416, Retrain Interval 42
+2025-07-28 11:51:15,413 [INFO] Checkpoint saved for fold 416
+2025-07-28 11:51:15,415 [INFO] Fold 260, Retrain Interval 10
+2025-07-28 11:52:49,845 [INFO] Fold 260, Retrain Interval 20
+2025-07-28 11:53:29,976 [INFO] Fold 260, Retrain Interval 42
+2025-07-28 11:53:42,234 [INFO] Checkpoint saved for fold 260
+2025-07-28 11:53:42,236 [INFO] Fold 136, Retrain Interval 10
+2025-07-28 11:57:15,845 [INFO] Fold 136, Retrain Interval 20
+2025-07-28 11:58:25,412 [INFO] Fold 136, Retrain Interval 42
+2025-07-28 11:58:47,265 [INFO] Checkpoint saved for fold 136
+2025-07-28 14:13:44,520 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-07-28 14:13:44,536 [INFO] Fold 18, Retrain Interval 10
+2025-07-28 14:15:33,955 [INFO] Fold 18, Retrain Interval 20
+2025-07-28 14:16:59,932 [INFO] Fold 18, Retrain Interval 42
+2025-07-28 14:17:43,704 [INFO] Checkpoint saved for fold 18
+2025-07-28 14:17:43,706 [INFO] Fold 309, Retrain Interval 10
+2025-07-28 14:25:17,423 [INFO] Fold 309, Retrain Interval 20
+2025-07-28 14:29:52,873 [INFO] Fold 309, Retrain Interval 42
+2025-07-28 14:31:21,890 [INFO] Checkpoint saved for fold 309
+2025-07-28 14:31:21,891 [INFO] Fold 65, Retrain Interval 10
+2025-07-28 14:35:23,172 [INFO] Fold 65, Retrain Interval 20
+2025-07-28 14:37:43,276 [INFO] Fold 65, Retrain Interval 42
+2025-07-28 14:38:53,938 [INFO] Checkpoint saved for fold 65
+2025-07-28 14:38:53,940 [INFO] Fold 671, Retrain Interval 10
+2025-07-28 14:41:02,242 [INFO] Fold 671, Retrain Interval 20
+2025-07-28 14:43:16,427 [INFO] Fold 671, Retrain Interval 42
+2025-07-28 14:44:21,144 [INFO] Checkpoint saved for fold 671
+2025-07-28 14:44:21,146 [INFO] Fold 34, Retrain Interval 10
+2025-07-28 14:45:51,586 [INFO] Fold 34, Retrain Interval 20
+2025-07-28 14:48:30,135 [INFO] Fold 34, Retrain Interval 42
+2025-07-28 14:48:51,697 [INFO] Checkpoint saved for fold 34
+2025-07-28 14:48:51,698 [INFO] Fold 137, Retrain Interval 10
+2025-07-28 14:51:20,305 [INFO] Fold 137, Retrain Interval 20
+2025-07-28 14:53:00,894 [INFO] Fold 137, Retrain Interval 42
+2025-07-28 14:53:43,064 [INFO] Checkpoint saved for fold 137
+2025-07-28 14:53:43,066 [INFO] Fold 416, Retrain Interval 10
+2025-07-28 14:56:18,530 [INFO] Fold 416, Retrain Interval 20
+2025-07-28 14:59:35,290 [INFO] Fold 416, Retrain Interval 42
+2025-07-28 15:00:54,024 [INFO] Checkpoint saved for fold 416
+2025-07-28 15:00:54,026 [INFO] Fold 260, Retrain Interval 10
+2025-07-28 15:08:17,677 [INFO] Fold 260, Retrain Interval 20
+2025-07-28 15:09:46,010 [INFO] Fold 260, Retrain Interval 42
+2025-07-28 15:36:17,768 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-07-28 15:36:17,783 [INFO] Fold 18, Retrain Interval 10
+2025-07-28 15:39:01,517 [INFO] Fold 18, Retrain Interval 20
+2025-07-28 15:41:00,818 [INFO] Fold 18, Retrain Interval 42
+2025-07-28 15:42:01,687 [INFO] Checkpoint saved for fold 18
+2025-07-28 15:42:01,689 [INFO] Fold 309, Retrain Interval 10
+2025-07-28 15:52:47,865 [INFO] Fold 309, Retrain Interval 20
+2025-07-28 15:59:00,848 [INFO] Fold 309, Retrain Interval 42
+2025-07-28 16:00:46,816 [INFO] Checkpoint saved for fold 309
+2025-07-28 16:00:46,818 [INFO] Fold 65, Retrain Interval 10
+2025-07-28 16:06:19,495 [INFO] Fold 65, Retrain Interval 20
+2025-07-28 16:09:34,528 [INFO] Fold 65, Retrain Interval 42
+2025-07-28 16:11:02,499 [INFO] Checkpoint saved for fold 65
+2025-07-28 16:11:02,501 [INFO] Fold 671, Retrain Interval 10
+2025-07-28 16:14:08,262 [INFO] Fold 671, Retrain Interval 20
+2025-07-28 16:16:39,739 [INFO] Fold 671, Retrain Interval 42
+2025-07-28 16:18:12,521 [INFO] Checkpoint saved for fold 671
+2025-07-28 16:18:12,523 [INFO] Fold 34, Retrain Interval 10
+2025-07-28 16:27:09,964 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-07-28 16:27:09,965 [INFO] Found existing results file at data/tuning_results/csv/tier2_arima.csv. Resuming...
+2025-07-28 16:27:09,970 [INFO] Already processed 4 folds. Skipping them.
+2025-07-28 16:27:09,981 [INFO] Fold 34, Retrain Interval 10
+2025-07-28 16:45:43,631 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-07-28 16:45:43,632 [INFO] Found existing results file at data/tuning_results/csv/tier2_arima.csv. Resuming...
+2025-07-28 16:45:43,637 [INFO] Already processed 4 folds. Skipping them.
+2025-07-28 16:45:43,650 [INFO] Fold 34, Retrain Interval 10
+2025-07-28 17:10:51,297 [INFO] Fold 34, Retrain Interval 20
+2025-07-28 17:12:33,467 [INFO] Fold 34, Retrain Interval 42
+2025-07-28 17:13:03,868 [INFO] Checkpoint saved for fold 34
+2025-07-28 17:13:03,870 [INFO] Fold 137, Retrain Interval 10
+2025-07-28 17:16:17,477 [INFO] Fold 137, Retrain Interval 20
+2025-07-28 17:20:02,918 [INFO] Fold 137, Retrain Interval 42
+2025-07-28 17:20:42,165 [INFO] Checkpoint saved for fold 137
+2025-07-28 17:20:42,166 [INFO] Fold 416, Retrain Interval 10
+2025-07-28 17:26:00,106 [INFO] Fold 416, Retrain Interval 20
+2025-07-28 17:31:54,157 [INFO] Fold 416, Retrain Interval 42
+2025-07-28 17:35:38,276 [INFO] Checkpoint saved for fold 416
+2025-07-28 17:35:38,279 [INFO] Fold 260, Retrain Interval 10
+2025-07-28 17:40:44,770 [INFO] Fold 260, Retrain Interval 20
+2025-07-28 17:42:43,471 [INFO] Fold 260, Retrain Interval 42
+2025-07-28 17:43:51,989 [INFO] Checkpoint saved for fold 260
+2025-07-28 17:43:51,990 [INFO] Fold 136, Retrain Interval 10
+2025-07-28 17:52:24,960 [INFO] Fold 136, Retrain Interval 20
+2025-07-28 17:54:40,682 [INFO] Fold 136, Retrain Interval 42
+2025-07-28 17:55:36,132 [INFO] Checkpoint saved for fold 136

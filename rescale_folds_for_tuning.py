@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import shutil
 
 # ===================================================================
 # 1. CONFIG
@@ -105,5 +106,8 @@ if __name__ == "__main__":
     summary_path = os.path.join(OUTPUT_RESCALED, "folds_summary_rescaled.json")
     with open(summary_path, 'w') as f:
         json.dump(final_summary, f, indent=4)
+    # Copy representative folds JSONs
+    shutil.copy('data/processed_folds/arima/arima_tuning_folds.json', 'data/scaled_folds/arima/arima_tuning_folds.json')
+    shutil.copy('data/processed_folds/lstm/lstm_tuning_folds.json', 'data/scaled_folds/lstm/lstm_tuning_folds.json')
 
     print(f"[DONE] Rescaled fold summary saved -> {summary_path}")

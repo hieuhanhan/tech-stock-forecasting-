@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from joblib import dump
 
 # ===================================================================
 # 1. CONFIG
@@ -40,7 +41,7 @@ def global_scale_data(df):
     out_path = os.path.join(GLOBAL_SCALED_PATH, "train_val_scaled.csv")
     df_scaled.to_csv(out_path, index=False)
     print(f"[INFO] Global scaled dataset saved -> {out_path}")
-    return df_scaled
+    return df_scaled, mm, ss
 
 # ===================================================================
 # 3. GENERATE FOLDS FROM SCALED DATA
@@ -110,7 +111,17 @@ if __name__ == "__main__":
     train_val_df['Date'] = pd.to_datetime(train_val_df['Date'])
 
     # Step 1: Global scale
-    scaled_df = global_scale_data(train_val_df)
+    scaled_df, mm, ss = global_scale_data(train_val_df)
+
+    # Create directory before saving scalers
+    os.makedirs('data/scalers', exist_ok=True)
+    dump(mm, 'data/scalers/global_mm.pkl')
+    dump(ss, 'data/scalers/global_ss.pkl')
+    print("[INFO] Global scalers saved -> data/scalers/global_mm.pkl & global_ss.pkl")
 
     # Step 2: Generate folds
     generate_folds(scaled_df, TRAIN_WINDOW_SIZE, VAL_WINDOW_SIZE, STEP_SIZE)
+
+    
+
+    

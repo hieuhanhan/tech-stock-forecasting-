@@ -13,8 +13,10 @@ from statsmodels.tsa.arima.model import ARIMA
 from skopt import gp_minimize
 from skopt.space import Integer
 from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize as pymoo_minimize
 from pymoo.core.problem import ElementwiseProblem
+from pymoo.core.sampling import Sampling
 
 # ─── CONFIG & LOGGING ─────────────────────────────────────
 LOG_DIR = "logs"
@@ -22,6 +24,9 @@ GA_POP_SIZE = 35
 GA_N_GEN = 25
 BO_N_CALLS = 50
 TOP_N_SEEDS = 5
+BASE_COST = 0.0005
+SLIPPAGE = 0.0002
+DEFAULT_T2_NGEN = 40
 
 # ─── HELPERS ─────────────────────────────────────────
 def arima_rmse(params, train, val):
@@ -45,7 +50,7 @@ def max_drawdown(r):
     peak = np.maximum.accumulate(cum)
     return np.max((peak - cum) / (peak + np.finfo(float).eps))
 
-def create_periodic_arima_objective(train, val, retrain_interval=20, cost=0.0005):
+def create_periodic_arima_objective(train, val, retrain_interval=20, cost=BASE_COST):
     """
     Walk‐forward ARIMA backtest with periodic retraining:
       - train: 1D np.array of in‐sample log‐returns
@@ -126,7 +131,7 @@ class FromTier1SeedSampling(Sampling):
 def main():
     parser = argparse.ArgumentParser("ARIMA tuning pipeline")
     parser.add_argument('--phase', type=int, choices=[1, 2], required=True)
-    parser.add_argument('--data-dir', default='data/processed_folds')
+    parser.add_argument('--data-dir', default='data/scaled_folds')
     parser.add_argument('--max-folds', type=int, default=None)
     parser.add_argument('--tier1-json', dest='tier1_json',
                     default='data/tuning_results/jsons/tier1_arima.json')
@@ -149,8 +154,10 @@ def main():
     np.random.seed(42)
 
     # Load fold metadata
-    folds_summary = os.path.join(args.data_dir, 'folds_summary.json')
-    summary = {f['global_fold_id']: f for f in json.load(open(folds_summary))}
+    folds_summary = os.path.join(args.data_dir, 'folds_summary_rescaled.json')
+    with open(folds_summary, 'r') as f:
+        folds_data = json.load(f)
+    summary = {f['fold_id']: f for f in folds_data['arima']}
     arima_reps_path = os.path.join(args.data_dir, 'arima', 'arima_tuning_folds.json')
     reps = [r['fold_id'] for r in json.load(open(arima_reps_path))]
 
@@ -173,14 +180,8 @@ def main():
 
         for fid in tqdm(pending, desc='Tier1 ARIMA'):
             info = summary[fid]
-            train = pd.read_csv(
-                os.path.join(args.data_dir, info['train_path_arima_prophet']),
-                parse_dates=['Date']
-            )
-            val = pd.read_csv(
-                os.path.join(args.data_dir, info['val_path_arima_prophet']),
-                parse_dates=['Date']
-            )
+            train = pd.read_csv(os.path.join(args.data_dir, info['train_path']), parse_dates=['Date'])
+            val = pd.read_csv(os.path.join(args.data_dir, info['val_path']), parse_dates=['Date'])
             train_ret = train['Log_Returns'].dropna().values
             val_ret = val['Log_Returns'].values
 
@@ -203,7 +204,10 @@ def main():
             logging.info(f"Collected {len(algorithm.history)} generations in GA history")
 
             # Pick top seeds from GA
-            all_individuals = [ind for pop in algorithm.history for ind in pop]
+            all_individuals = []
+            for entry in algorithm.history:
+                all_individuals.extend(entry.pop)
+
             seen = set()
             unique_seeds = []
             for ind in all_individuals:
@@ -214,8 +218,15 @@ def main():
 
             unique_seeds.sort(key=lambda ind: ind.F[0])
             top_seeds_for_bo = unique_seeds[:TOP_N_SEEDS]
-            x0 = [[int(ind.X[0]), int(ind.X[1])] for ind in top_seeds_for_bo]
-            y0 = [ind.F[0] for ind in top_seeds_for_bo]
+
+            if len(top_seeds_for_bo) == 0:
+                best = res_ga.pop.get("F").argmin()
+                best_ind = res_ga.pop[best]
+                x0 = [[int(best_ind.X[0]), int(best_ind.X[1])]]
+                y0 = [best_ind.F[0]]
+            else:
+                x0 = [[int(ind.X[0]), int(ind.X[1])] for ind in top_seeds_for_bo]
+                y0 = [float(ind.F[0]) for ind in top_seeds_for_bo]
 
             # BO refinement
             res_bo = gp_minimize(
@@ -229,7 +240,10 @@ def main():
 
             best_p, best_q = map(int, res_bo.x)
 
-            top_ga = [{'p': p, 'q': q} for p, q, _ in unique_seeds]
+            top_ga = [
+                {'p': int(ind.X[0]), 'q': int(ind.X[1]), 'rmse': float(ind.F[0])}
+                for ind in unique_seeds
+            ]
             results.append({'fold_id': fid,
                             'best_params': {'p': best_p, 'd': 0, 'q': best_q},
                             'rmse': float(res_bo.fun),
@@ -263,8 +277,8 @@ def main():
         for fid in tqdm(pending, desc='Tier2 ARIMA MOGA'):
             params = champions[fid]
             info = summary[fid]
-            train = pd.read_csv(os.path.join(args.data_dir, info['train_path_arima']))
-            val = pd.read_csv(os.path.join(args.data_dir, info['val_path_arima']))
+            train = pd.read_csv(os.path.join(args.data_dir, info['train_path']))
+            val = pd.read_csv(os.path.join(args.data_dir, info['val_path']))
             train_ret = train['Log_Returns'].dropna().values
             val_ret = val['Log_Returns'].values
             
@@ -285,7 +299,7 @@ def main():
 
             res_moga = pymoo_minimize(
                 prob,
-                NSGA2(pop_size=25, sampling=sampling),
+                NSGA2(pop_size=30, sampling=sampling),
                 ('n_gen', DEFAULT_T2_NGEN),
                 seed=42,
                 verbose=False
