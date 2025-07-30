@@ -35,7 +35,6 @@ def main():
     os.makedirs("figures", exist_ok=True)
 
     # Setup logging
-    os.makedirs("logs", exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -46,7 +45,6 @@ def main():
     )
 
     np.random.seed(42)
-    os.makedirs("figures", exist_ok=True)
     logging.info(f"Running sensitivity analysis for retrain_intervals={retrain_intervals}")
 
     # Load fold summary
