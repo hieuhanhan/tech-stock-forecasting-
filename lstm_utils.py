@@ -19,8 +19,8 @@ from tensorflow.keras.optimizers import Adam
 # Configs
 LOG_DIR = "logs"
 DEFAULT_T1_EPOCHS = 10
-DEFAULT_T2_EPOCHS = 15
-DEFAULT_T2_NGEN_LSTM = 8
+DEFAULT_T2_EPOCHS = 10
+DEFAULT_T2_NGEN_LSTM = 10
 BATCH_SIZE = 32
 PATIENCE = 3
 TRADING_DAYS = 252
@@ -155,7 +155,7 @@ class Tier2MOGAProblem(ElementwiseProblem):
 # objective for tier2 with walk-forward validation
 
 def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
-                                   retrain_interval, base_cost=BASE_COST):
+                                   retrain_interval, cost):
     """
     Walk-forward LSTM backtest with periodic retraining every `retrain_interval` steps.
     - tr_df: in-sample dataframe
@@ -167,9 +167,11 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
     Returns f(x)->(-Sharpe, MaxDrawdown) for x=(window,units,lr,epochs,thresh_rel).
     """
     X_full, y_full = tr_df[feats].values, tr_df['target'].values
-    X_val,   y_val   = val_df[feats].values, val_df['target'].values
-    cost = base_cost + SLIPPAGE
-    n_val = len(y_val)
+    X_val, y_val_for_model_training = val_df[feats].values, val_df['target'].values
+    y_val_for_metrics = val_df['target_log_returns'].values
+
+    cost = BASE_COST + SLIPPAGE
+    n_val = len(y_val_for_model_training)
 
     def obj(x):
         w, units, lr, epochs, rel_thresh = x
@@ -192,8 +194,16 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
                 ds_tr = tf.data.Dataset.from_tensor_slices((win, tar)) \
                        .batch(batch_size) \
                        .prefetch(tf.data.AUTOTUNE)
+                
+                val_X_block = X_val[start:end]
+                val_y_block = y_val_for_model_training[start:end]
 
-                val_ds = tf.data.Dataset.from_tensor_slices((X_val[start:end], y_val[start:end])) \
+                X_val_concat_for_windows = np.concatenate([hist_X[-w:], val_X_block], axis=0)
+                y_val_concat_for_windows = np.concatenate([hist_y[-w:], val_y_block], axis=0)
+
+                win_val, tar_val = create_windows(X_val_concat_for_windows, y_val_concat_for_windows, w)
+
+                val_ds = tf.data.Dataset.from_tensor_slices((win_val, tar_val)) \
                                         .batch(batch_size) \
                                         .prefetch(tf.data.AUTOTUNE)
 
@@ -207,12 +217,32 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
 
                 # 2) forecast this block one-step at a time
                 preds = []
-                buf = list(hist_X[-w:])
+                buf = [x.copy() for x in hist_X[-w:]]
+
                 for i in range(start, end):
-                    inp = np.array(buf[-w:])[None, ...]  # shape (1,w,features)
-                    p = model.predict(inp, verbose=0)[0,0]
+                    # buffer should have at least `w` vectors of shape (features,)
+                    window_slice = np.array(buf[-w:])  # shape: (w, features)
+
+                    if window_slice.ndim != 2 or window_slice.shape[0] != w:
+                        logging.warning(f"Bad input window shape: {window_slice.shape}")
+                        return 1e3, 1e3
+
+                    inp = window_slice[None, ...]  # shape: (1, w, features)
+                    logging.info(f"inp shape before predict: {inp.shape}")
+
+                    try:
+                        p = model.predict(inp, verbose=0)[0, 0]
+                    except Exception as e:
+                        logging.warning(f"Model predict failed: {e}")
+                        return 1e3, 1e3
+
                     preds.append(p)
-                    buf.append(X_val[i])  # append true features for next window
+
+                    # append next true feature vector, ensure shape is (features,)
+                    next_x = X_val[i]
+                    if next_x.ndim > 1:
+                        next_x = next_x.ravel()
+                    buf.append(next_x.copy())
 
                 preds = np.array(preds)
 
@@ -226,12 +256,12 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
                     return 1e3, 1e3
 
                 # block returns
-                ret_block = y_val[start:end] * sig - cost * sig
+                ret_block = y_val_for_metrics[start:end] * sig - cost * sig
                 all_returns.append(ret_block)
 
                 # 3) expand history with actual outcomes
                 hist_X = np.vstack([hist_X, X_val[start:end]])
-                hist_y = np.concatenate([hist_y, y_val[start:end]])
+                hist_y = np.concatenate([hist_y, y_val_for_model_training[start:end]])
 
             # flatten
             net_returns = np.concatenate(all_returns)

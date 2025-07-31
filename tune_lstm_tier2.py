@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
-import tqdm
 import argparse
 import json
 import os
 import logging
 import tensorflow as tf
+from tqdm import tqdm
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize as pymoo_minimize
@@ -51,7 +51,7 @@ def main():
     logging.info(f"Running sensitivity analysis for retrain_intervals={retrain_intervals}")
 
     with open(os.path.join(data_dir, 'folds_summary_rescaled.json')) as f:
-        summary = {f['fold_id']: f for f in json.load(f)['arima']}
+        summary = {f['fold_id']: f for f in json.load(f)['lstm']}  
     with open(os.path.join(data_dir, 'lstm', 'lstm_tuning_folds.json')) as f:
         reps = [r['fold_id'] for r in json.load(f)]
     with open(args.tier1_json) as f:
@@ -75,6 +75,9 @@ def main():
     champion_items = [(fid, params) for fid, params in champions.items() if fid not in processed_folds]
 
     for fid, champ in tqdm(champion_items, desc="Sensitivity Analysis"):
+        if fid not in summary:
+            logging.warning(f"Fold {fid} not found in summary. Skipping.")
+            continue
         info = summary[fid]
         train = pd.read_csv(os.path.join(data_dir, info['train_path']))
         val = pd.read_csv(os.path.join(data_dir, info['val_path']))
@@ -86,7 +89,7 @@ def main():
             obj = create_periodic_lstm_objective(
                 train, val, 
                 features, champ, 
-                retrain_intervals=interval, 
+                retrain_interval=interval, 
                 cost=BASE_COST + SLIPPAGE)
 
             prob = Tier2MOGAProblem(obj)
@@ -96,10 +99,15 @@ def main():
 
             for m in multipliers:
                 for t in thresholds:
+                    # log-scale adjustment for learning rate
+                    log_lr = np.log(champ['lr'])
+                    adjusted_log_lr = log_lr * m
+                    adjusted_lr = float(np.clip(np.exp(adjusted_log_lr), 1e-4, 1e-2))
+
                     seeds.append([
                         max(10, min(40, int(champ['window'] * m))),
                         max(32, min(64, int(champ['units'] * m))),
-                        float(champ['lr'] * m),
+                        adjusted_lr,
                         DEFAULT_T2_EPOCHS,
                         float(t)
                     ])
@@ -108,23 +116,26 @@ def main():
 
             res = pymoo_minimize(
                 prob,
-                NSGA2(pop_size=10, sampling=sampling),
+                NSGA2(pop_size=15, sampling=sampling),
                 ('n_gen', DEFAULT_T2_NGEN_LSTM), 
                 seed=42, 
                 verbose=False
             )
             logging.info(f"NSGA2 result: Pareto front size = {len(res.F)}")
-            best_idx = np.argmin(res.F[:,0]) 
-            logging.info(f"Best Sharpe = {-res.F[best_idx, 0]:.4f}, MDD = {res.F[best_idx,1]:.4f}")
 
             for x, F in zip(res.X, res.F):
+                w, units, lr, epochs, threshold = x
                 all_results.append({
                     'fold_id': fid,
+                    'ticker': info['ticker'],  
                     'retrain_interval': interval,
-                    'params': x.tolist(),
-                    'threshold': float(x[4]),
-                    'sharpe': -F[0],
-                    'mdd': F[1]
+                    'window': int(w),
+                    'units': int(units),
+                    'learning_rate': float(f"{lr:.6f}"),
+                    'epochs': int(epochs),
+                    'threshold': float(threshold),
+                    'sharpe': round(-F[0], 4),
+                    'mdd': round(F[1], 6)
                 })
 
             pd.DataFrame(all_results).to_csv(args.tier2_csv, index=False)

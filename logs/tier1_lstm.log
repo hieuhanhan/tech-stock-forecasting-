@@ -70,3 +70,66 @@
 2025-07-30 16:43:14,009 [INFO] Running fold 513 for ticker NVDA
 2025-07-30 16:43:19,643 [WARNING] 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x16fd702c0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
 2025-07-30 16:43:19,739 [WARNING] 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x16fd702c0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-30 17:15:04,914 [INFO] Best BO Parameters:
+2025-07-30 17:15:04,915 [INFO] window: 10
+2025-07-30 17:15:04,915 [INFO] layers: 2
+2025-07-30 17:15:04,915 [INFO] units: 39
+2025-07-30 17:15:04,915 [INFO] lr: 0.01
+2025-07-30 17:15:04,915 [INFO] batch_size: 26
+2025-07-30 17:15:04,915 [INFO] Completed fold 513 with RMSE: 0.0018
+2025-07-30 17:15:04,916 [INFO] Running fold 510 for ticker NVDA
+2025-07-31 09:44:00,096 [INFO] Running fold 510 for ticker NVDA
+2025-07-31 09:44:05,593 [WARNING] 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x30b071260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 09:44:05,689 [WARNING] 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x30b071260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 10:15:38,390 [INFO] Best BO Parameters:
+2025-07-31 10:15:38,391 [INFO] window: 31.330238055528252
+2025-07-31 10:15:38,391 [INFO] layers: 2.5271282556487282
+2025-07-31 10:15:38,391 [INFO] units: 34.369428855490895
+2025-07-31 10:15:38,391 [INFO] lr: 0.0035865917762189932
+2025-07-31 10:15:38,391 [INFO] batch_size: 23.352823239335535
+2025-07-31 10:15:38,392 [INFO] Completed fold 510 with RMSE: 0.0161
+2025-07-31 10:15:38,394 [INFO] Running fold 313 for ticker META
+2025-07-31 10:16:51,267 [INFO] Running fold 313 for ticker META
+2025-07-31 10:16:56,386 [WARNING] 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x166971260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 10:16:56,484 [WARNING] 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x166971260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 10:40:45,079 [INFO] Best BO Parameters:
+2025-07-31 10:40:45,079 [INFO] window: 31.93613003537063
+2025-07-31 10:40:45,079 [INFO] layers: 2.550265646722229
+2025-07-31 10:40:45,079 [INFO] units: 62.063966130054055
+2025-07-31 10:40:45,079 [INFO] lr: 0.009328099113332542
+2025-07-31 10:40:45,079 [INFO] batch_size: 43.866977595114285
+2025-07-31 10:40:45,079 [INFO] Completed fold 313 with RMSE: 0.4547
+2025-07-31 10:40:45,080 [INFO] Running fold 561 for ticker NVDA
+2025-07-31 10:51:14,344 [INFO] Running fold 561 for ticker NVDA
+2025-07-31 10:51:20,213 [WARNING] 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x15f171260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 10:51:20,311 [WARNING] 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x15f171260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 11:14:17,884 [INFO] Best BO Parameters:
+2025-07-31 11:14:17,885 [INFO] window: 26.694124128297336
+2025-07-31 11:14:17,885 [INFO] layers: 1.341048247374583
+2025-07-31 11:14:17,885 [INFO] units: 32.31379902330832
+2025-07-31 11:14:17,885 [INFO] lr: 0.009589032342756616
+2025-07-31 11:14:17,885 [INFO] batch_size: 61.89183401855536
+2025-07-31 11:14:17,885 [INFO] Completed fold 561 with RMSE: 0.4760
+2025-07-31 11:14:17,887 [INFO] Running fold 613 for ticker TSLA
+2025-07-31 11:16:05,744 [INFO] Running fold 613 for ticker TSLA
+2025-07-31 11:16:10,974 [WARNING] 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x173e5d4e0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 11:16:11,071 [WARNING] 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x173e5d4e0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 12:36:39,950 [INFO] Best BO Parameters:
+2025-07-31 12:36:39,952 [INFO] window: 15.335188130425895
+2025-07-31 12:36:39,952 [INFO] layers: 1.5985703211553441
+2025-07-31 12:36:39,952 [INFO] units: 61.38091526206884
+2025-07-31 12:36:39,952 [INFO] lr: 0.004356348685640861
+2025-07-31 12:36:39,952 [INFO] batch_size: 52.34806765802953
+2025-07-31 12:36:39,952 [INFO] Completed fold 613 with RMSE: 0.4600
+2025-07-31 12:36:39,955 [INFO] Running fold 163 for ticker AMZN
+2025-07-31 15:11:59,118 [INFO] Running fold 163 for ticker AMZN
+2025-07-31 15:12:04,206 [WARNING] 5 out of the last 5 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x16bf71260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 15:12:04,303 [WARNING] 6 out of the last 6 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x16bf71260> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+2025-07-31 15:35:13,984 [INFO] Best BO Parameters:
+2025-07-31 15:35:13,985 [INFO] window: 21.596203631966592
+2025-07-31 15:35:13,985 [INFO] layers: 1.5987498751677631
+2025-07-31 15:35:13,985 [INFO] units: 56.66802109109459
+2025-07-31 15:35:13,985 [INFO] lr: 0.005464025319110368
+2025-07-31 15:35:13,985 [INFO] batch_size: 24.772265911237326
+2025-07-31 15:35:13,985 [INFO] Completed fold 163 with RMSE: 0.4255
+2025-07-31 15:35:13,991 [INFO] === Tier 1 complete ===
