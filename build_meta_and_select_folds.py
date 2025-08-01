@@ -5,6 +5,7 @@ import argparse
 import logging
 import numpy as np
 import pandas as pd
+from joblib import load
 from sklearn.cluster import KMeans
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import silhouette_score
@@ -116,14 +117,24 @@ def build_meta_arima(folds_summary):
 
 def build_meta_lstm(folds_summary):
     logging.info("[LSTM] Building meta-features...")
+
+    # Load feature columns from global scaler metadata
+    scaler_bundle_path = 'data/scalers/global_scalers.pkl'
+    if not os.path.exists(scaler_bundle_path):
+        raise FileNotFoundError(f"[LSTM] Could not find scaler metadata at {scaler_bundle_path}")
+    
+    scaler_bundle = load(scaler_bundle_path)
+    feature_cols = scaler_bundle['feature_cols']
+    logging.info(f"[LSTM] Loaded {len(feature_cols)} feature columns from global_scalers.pkl")
+
     meta_rows = []
     for fold in folds_summary:
-        val_path = os.path.join(OUTPUT_DIR, 'lstm', 'val',
-                                f"val_fold_{fold['global_fold_id']}.csv")
+        val_path = os.path.join(OUTPUT_DIR, 'lstm', 'val', f"val_fold_{fold['global_fold_id']}.csv")
         if not os.path.exists(val_path):
             continue
         df_val = pd.read_csv(val_path)
-        features = df_val.drop(columns=['Date', 'Ticker', 'target', 'target_log_returns'], errors='ignore')
+
+        features = df_val[feature_cols].copy()
         if features.shape[1] < 2:
             continue
 
@@ -140,7 +151,6 @@ def build_meta_lstm(folds_summary):
             'volatility_std': df_val['Log_Returns'].std()
         })
     return pd.DataFrame(meta_rows)
-
 
 # ===================================================================
 # 3. MAIN LOGIC

@@ -65,15 +65,16 @@ def main():
     if os.path.exists(args.tier2_csv):
         logging.info(f"Found existing results file at {args.tier2_csv}. Resuming...")
         df_existing = pd.read_csv(args.tier2_csv)
-        processed_folds = set(df_existing['fold_id'].unique())
+        processed_combinations = set(zip(df_existing['fold_id'], df_existing['retrain_interval']))
         all_results = df_existing.to_dict('records')
         logging.info(f"Already processed {len(processed_folds)} folds. Skipping them.")
+    else:
+        processed_combinations = set()
 
     if args.max_folds:
         champions = dict(list(champions.items())[:args.max_folds])
     # Filter out the folds that have already been processed
-    champion_items = [(fid, params) for fid, params in champions.items() if fid not in processed_folds]
-
+    champion_items = list(champions.items())  
     for fid, champ in tqdm(champion_items, desc="Sensitivity Analysis"):
         if fid not in summary:
             logging.warning(f"Fold {fid} not found in summary. Skipping.")
@@ -84,7 +85,11 @@ def main():
         features = [c for c in train.columns if c not in ['Date','Ticker','Log_Returns','target']]
 
         for interval in retrain_intervals:
-            logging.info(f"Fold {fid}, Retrain Interval {interval}")
+            if (fid, interval) in processed_combinations:
+                logging.info(f"Fold {fid}, interval {interval} already processed. Skipping.")
+                continue
+
+            logging.info(f"Processing Fold {fid}, Interval {interval}")
 
             obj = create_periodic_lstm_objective(
                 train, val, 

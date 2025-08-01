@@ -10,8 +10,10 @@ from joblib import dump
 # ===================================================================
 OUTPUT_BASE_DIR = 'data/processed_folds'
 GLOBAL_SCALED_PATH = 'data/global_scaled'
+SCALER_OUTPUT_PATH = 'data/scalers/global_scalers.pkl'
 os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
 os.makedirs(GLOBAL_SCALED_PATH, exist_ok=True)
+os.makedirs(os.path.dirname(SCALER_OUTPUT_PATH), exist_ok=True)
 
 TRAIN_WINDOW_SIZE = 252
 VAL_WINDOW_SIZE = 42
@@ -33,15 +35,31 @@ def global_scale_data(df):
         mm = MinMaxScaler()
         mm.fit(df_scaled[ohlcv_cols])
         df_scaled[ohlcv_cols] = mm.transform(df_scaled[ohlcv_cols])
+    else:
+        mm = None
+
     if ti_cols:
         ss = StandardScaler()
         ss.fit(df_scaled[ti_cols])
         df_scaled[ti_cols] = ss.transform(df_scaled[ti_cols])
+    else:
+        ss = None
 
     out_path = os.path.join(GLOBAL_SCALED_PATH, "train_val_scaled.csv")
     df_scaled.to_csv(out_path, index=False)
     print(f"[INFO] Global scaled dataset saved -> {out_path}")
-    return df_scaled, mm, ss
+
+    # Save scalers and column metadata
+    dump({
+        'minmax': mm,
+        'standard': ss,
+        'ohlcv_cols': ohlcv_cols,
+        'ti_cols': ti_cols,
+        'feature_cols': feature_cols
+    }, SCALER_OUTPUT_PATH)
+    print(f"[INFO] Global scalers saved -> {SCALER_OUTPUT_PATH}")
+    
+    return df_scaled
 
 # ===================================================================
 # 3. GENERATE FOLDS FROM SCALED DATA
@@ -67,8 +85,10 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
     for ticker in data_df_cleaned['Ticker'].unique():
         ticker_df = data_df_cleaned[data_df_cleaned['Ticker'] == ticker].sort_values(by='Date').reset_index(drop=True)
         if len(ticker_df) < train_window_size + val_window_size:
+            print(f"[WARN] Skipping {ticker} due to insufficient data")
             continue
 
+        folds_created = 0
         max_start_idx = len(ticker_df) - (train_window_size + val_window_size)
         for fold_start_idx in range(0, max_start_idx + 1, step_size):
             train_end_idx = fold_start_idx + train_window_size
@@ -80,23 +100,42 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
             if len(train_data) < train_window_size or len(val_data) < val_window_size:
                 continue
 
-            # Save ARIMA + LSTM folds
+            train_data['Date'] = train_data['Date'].astype(str)
+            val_data['Date'] = val_data['Date'].astype(str)
+
             train_file_name_prefix = f'train_fold_{global_fold_counter}'
             val_file_name_prefix = f'val_fold_{global_fold_counter}'
             meta_file_name_prefix = f'val_meta_fold_{global_fold_counter}'
 
-            train_data.to_csv(os.path.join(model_dirs['lstm']['train'], f'{train_file_name_prefix}.csv'), index=False)
-            val_data.to_csv(os.path.join(model_dirs['lstm']['val'], f'{val_file_name_prefix}.csv'), index=False)
+            # ARIMA columns (for Close/Volume modeling)
+            cols_for_arima = ['Date', 'Close', 'Log_Returns', 'Volume']
+            train_data[cols_for_arima].to_csv(
+                os.path.join(model_dirs['arima']['train'], f'{train_file_name_prefix}.csv'), index=False)
+            val_data[cols_for_arima].to_csv(
+                os.path.join(model_dirs['arima']['val'], f'{val_file_name_prefix}.csv'), index=False)
+
+            # LSTM columns — keep full features + 'target'
+            cols_for_lstm = [c for c in train_data.columns if c not in ['target_log_returns']]
+            train_data[cols_for_lstm].to_csv(
+                os.path.join(model_dirs['lstm']['train'], f'{train_file_name_prefix}.csv'), index=False)
+            val_data[cols_for_lstm].to_csv(
+                os.path.join(model_dirs['lstm']['val'], f'{val_file_name_prefix}.csv'), index=False)
+
+            # Meta output
             val_data[['Date', 'Close', 'Ticker', 'Log_Returns', 'target_log_returns', 'target']].to_csv(
                 os.path.join(model_dirs['shared_meta_dir_path'], f'{meta_file_name_prefix}.csv'), index=False)
-
+            
             all_folds_summary.append({
                 'global_fold_id': global_fold_counter,
                 'ticker': ticker,
+                'train_path_arima': os.path.join('arima', 'train', f'{train_file_name_prefix}.csv'),
+                'val_path_arima': os.path.join('arima', 'val', f'{val_file_name_prefix}.csv'),
                 'train_path_lstm': os.path.join('lstm', 'train', f'{train_file_name_prefix}.csv'),
                 'val_path_lstm': os.path.join('lstm', 'val', f'{val_file_name_prefix}.csv')
             })
             global_fold_counter += 1
+            folds_created += 1
+        print(f"[INFO] {folds_created} folds generated for {ticker}")
 
     with open(os.path.join(OUTPUT_BASE_DIR, 'folds_summary_global.json'), 'w') as f:
         json.dump(all_folds_summary, f, indent=4)
@@ -110,16 +149,10 @@ if __name__ == "__main__":
     train_val_df = pd.read_csv('data/cleaned/train_val_for_wf_with_features.csv')
     train_val_df['Date'] = pd.to_datetime(train_val_df['Date'])
 
-    # Step 1: Global scale
-    scaled_df, mm, ss = global_scale_data(train_val_df)
+    # Step 1: Global scaling
+    scaled_df = global_scale_data(train_val_df)
 
-    # Create directory before saving scalers
-    os.makedirs('data/scalers', exist_ok=True)
-    dump(mm, 'data/scalers/global_mm.pkl')
-    dump(ss, 'data/scalers/global_ss.pkl')
-    print("[INFO] Global scalers saved -> data/scalers/global_mm.pkl & global_ss.pkl")
-
-    # Step 2: Generate folds
+    # Step 2: Fold generation
     generate_folds(scaled_df, TRAIN_WINDOW_SIZE, VAL_WINDOW_SIZE, STEP_SIZE)
 
     

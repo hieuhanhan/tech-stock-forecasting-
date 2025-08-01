@@ -13,7 +13,6 @@ TOP_N_SEEDS = 5
 BASE_COST = 0.0005
 SLIPPAGE = 0.0002
 DEFAULT_T2_NGEN_ARIMA = 30
-DEFAULT_T2_NGEN_LSTM = 15
 
 # Evaluation Metrics
 
@@ -39,7 +38,7 @@ def max_drawdown(r):
 
 # Objective Wrapper
 
-def create_periodic_arima_objective(train, val, retrain_interval=20, cost=0.0005):
+def create_periodic_arima_objective(train, val, retrain_interval, cost=0.0005):
     def objective(x):
         p, q, rel_thresh = int(x[0]), int(x[1]), float(x[2])
         if not (0.0 < rel_thresh < 1.0):
