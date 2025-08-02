@@ -27,8 +27,8 @@ sharpe = (df["portfolio_return"].mean() / df["portfolio_return"].std()) * np.sqr
 mdd = ((np.maximum.accumulate(np.exp(np.cumsum(df["portfolio_return"]))) - np.exp(np.cumsum(df["portfolio_return"]))) / np.maximum.accumulate(np.exp(np.cumsum(df["portfolio_return"])))).max()
 cum_return = np.exp(df["portfolio_return"].sum()) - 1
 
-print(f"Sharpe Ratio      : {sharpe:.4f}")
-print(f"Max Drawdown      : {mdd:.4f}")
+print(f"Sharpe Ratio : {sharpe:.4f}")
+print(f"Max Drawdown : {mdd:.4f}")
 print(f"Cumulative Return : {cum_return:.4f}")
 
 # ========== Load Summary ==========

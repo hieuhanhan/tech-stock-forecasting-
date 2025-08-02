@@ -6,11 +6,6 @@ from statsmodels.tsa.stattools import adfuller
 import matplotlib.pyplot as plt
 # --- Helper Function: ADF Test ---
 def perform_adf_test(series, fold_id):
-    """
-    Performs the Augmented Dickey-Fuller test on a series and returns the p-value.
-    """
-    # The adfuller function can't handle NaNs, so we ensure they are dropped.
-    # Your 'Log_Returns' column should already have NaNs removed from its creation.
     result = adfuller(series.dropna())
     p_value = result[1]
     
@@ -25,19 +20,14 @@ def perform_adf_test(series, fold_id):
     
     return p_value
 
-# --- Step 1: Load your list of 75 representative fold IDs ---
-# This is where you would load your 'representative_fold_ids.json' file.
-# For this example, I will create a sample list of IDs.
-# In your actual code, use this:
 with open('data/processed_folds/shared_meta/representative_fold_ids.json', 'r') as f:
     representative_fold_ids = json.load(f)
-
 
 adf_results = {}
 
 for fold_id in representative_fold_ids:
-    np.random.seed(fold_id) # Use fold_id for reproducibility
-    log_returns_sample = pd.Series(np.random.randn(250) * 0.02) # Typical daily log returns
+    np.random.seed(fold_id) 
+    log_returns_sample = pd.Series(np.random.randn(250) * 0.02)
     fold_data = pd.DataFrame({'Log_Returns': log_returns_sample})
 
      # Isolate the 'Log_Returns' series
@@ -47,20 +37,11 @@ for fold_id in representative_fold_ids:
     p_value = perform_adf_test(log_returns_series, fold_id)
     adf_results[fold_id] = p_value
     
-    # --- THIS IS THE PART YOU NEED TO ADAPT ---
-    # Load the data for the specific fold_id.
-    # This data should already contain your 'Log_Returns' column.
-    # Example: fold_data = pd.read_csv(f'path/to/data/fold_{fold_id}.csv')
-    
-    # For demonstration, I'll create sample data for the fold
-    # that mimics having a 'Log_Returns' column.
-    np.random.seed(fold_id) # Use fold_id for reproducibility
-    log_returns_sample = pd.Series(np.random.randn(250) * 0.02) # Typical daily log returns
+    log_returns_sample = pd.Series(np.random.randn(250) * 0.02) 
     fold_data = pd.DataFrame({'Log_Returns': log_returns_sample})
 
     log_returns_series = fold_data['Log_Returns']
     
-    # Perform the ADF test and store the result
     p_value = perform_adf_test(log_returns_series, fold_id)
     adf_results[fold_id] = p_value
 

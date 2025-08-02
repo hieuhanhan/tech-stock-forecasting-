@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # ========== CONFIG ==========
 INPUT_CSV = "data/backtest_curves/portfolio_equity_curve.csv"
 OUTPUT_FIG = "figures/portfolio_equity_curve_comparison.png"
-MAX_RETURN = 0.1  # Clipping threshold
+MAX_RETURN = 0.1  
 
 # ========== LOAD & CLIP ==========
 df = pd.read_csv(INPUT_CSV)

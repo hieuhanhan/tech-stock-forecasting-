@@ -34,7 +34,7 @@ def load_knee_points_data(model_type: str) -> pd.DataFrame:
 def main():
     logging.info("Starting model performance comparison.")
 
-    model_types = ['arima', 'prophet', 'lstm', 'gru'] # List all models to compare
+    model_types = ['arima', 'lstm']
     all_models_knee_points = []
 
     for model_type in model_types:
