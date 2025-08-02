@@ -4,7 +4,7 @@ import os
 
 # ── CONFIG ──
 tier2_csv = "data/tuning_results/csv/tier2_arima_with_ticker.csv"      
-output_csv = "data/backtest_configs/knee_point_per_fold.csv"
+output_csv = "data/backtest_configs/knee_point_per_fold_arima.csv"
 
 # ── LOAD & FILTER ──
 df = pd.read_csv(tier2_csv)

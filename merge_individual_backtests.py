@@ -48,7 +48,6 @@ def main():
     else:
         print("[WARN] No summary files found.")
 
-    # --- Gộp CURVES ---
     curve_paths = glob.glob(os.path.join(args.curves_dir, "*_equity_curve.csv"))
     curves = []
     for p in curve_paths:
@@ -79,8 +78,8 @@ def main():
     port_mdd = max_drawdown(pd.Series(port_ret))
     port_cum = float(np.exp(np.sum(port_ret)) - 1)
     print("\n[Portfolio Metrics]")
-    print(f"Sharpe Ratio      : {port_sharpe:.4f}")
-    print(f"Max Drawdown      : {port_mdd:.4f}")
+    print(f"Sharpe Ratio : {port_sharpe:.4f}")
+    print(f"Max Drawdown : {port_mdd:.4f}")
     print(f"Cumulative Return : {port_cum:.4f}")
 
 if __name__ == "__main__":
