@@ -39,7 +39,7 @@ def main():
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(message)s',
         handlers=[
-            logging.FileHandler("logs/phase2_arima.log"),
+            logging.FileHandler("logs/phase2_arima_test.log"),
             logging.StreamHandler()
         ]
     )

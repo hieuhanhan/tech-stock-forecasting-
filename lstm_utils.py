@@ -157,12 +157,6 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
                                    retrain_interval, cost):
     """
     Walk-forward LSTM backtest with periodic retraining every `retrain_interval` steps.
-    - tr_df: in-sample dataframe
-    - val_df: out-of-sample dataframe
-    - feats: list of feature column Hnames
-    - champ: dict of Tier 1 champion hyperparams (includes 'layers')
-    - retrain_interval: steps between refits
-    - base_cost: per-trade cost (we’ll add SLIPPAGE internally)
     Returns f(x)->(-Sharpe, MaxDrawdown) for x=(window,units,lr,epochs,thresh_rel).
     """
     X_full, y_full = tr_df[feats].values, tr_df['target'].values
@@ -219,7 +213,6 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
                 buf = [x.copy() for x in hist_X[-w:]]
 
                 for i in range(start, end):
-                    # buffer should have at least `w` vectors of shape (features,)
                     window_slice = np.array(buf[-w:])  # shape: (w, features)
 
                     if window_slice.ndim != 2 or window_slice.shape[0] != w:
@@ -237,7 +230,6 @@ def create_periodic_lstm_objective(tr_df, val_df, feats, champ,
 
                     preds.append(p)
 
-                    # append next true feature vector, ensure shape is (features,)
                     next_x = X_val[i]
                     if next_x.ndim > 1:
                         next_x = next_x.ravel()

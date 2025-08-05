@@ -12,7 +12,7 @@ BO_N_CALLS = 50
 TOP_N_SEEDS = 5
 BASE_COST = 0.0005
 SLIPPAGE = 0.0002
-DEFAULT_T2_NGEN_ARIMA = 30
+DEFAULT_T2_NGEN_ARIMA = 40
 
 # Evaluation Metrics
 
@@ -38,14 +38,15 @@ def max_drawdown(r):
 
 # Objective Wrapper
 
-def create_periodic_arima_objective(train, val, retrain_interval, cost=0.0005):
+def create_periodic_arima_objective(train, val, retrain_interval, cost):
     def objective(x):
-        p, q, rel_thresh = int(x[0]), int(x[1]), float(x[2])
-        if not (0.0 < rel_thresh < 1.0):
+        p, q, threshold = int(x[0]), int(x[1]), float(x[2])
+        if not (0.5 < threshold < 2.5):
             return 1e3, 1e3
 
         history = train.copy()
-        all_returns = []
+        all_simple_returns = []
+        all_log_returns = []
         n = len(val)
 
         for start in range(0, n, retrain_interval):
@@ -57,17 +58,36 @@ def create_periodic_arima_objective(train, val, retrain_interval, cost=0.0005):
 
             h = end - start
             forecast = model.forecast(steps=h)
-            threshold_value = np.quantile(forecast, rel_thresh)
-            signals = (forecast > threshold_value).astype(int)
-            if signals.sum() == 0:
-                return 1e3, 1e3
+            residual_std = np.std(model.resid)
 
-            block_returns = val[start:end] * signals - cost * signals
-            all_returns.append(block_returns)
+            block_volatility = np.std(val[start:end])
+            if block_volatility < 0.002:  
+                return 1e3, 1e3
+            
+            z_score = (forecast - forecast.mean()) / (residual_std + 1e-8)
+            if z_score > threshold:
+                signals = 1
+            elif z_score < -threshold:
+                signals = -1 
+            else:
+                signals = 0
+            
+            val_block_log = val[start:end]
+            val_block_simple = np.exp(val_block_log) - 1
+
+            block_simple_return = val_block_simple * signals - cost * (signals != 0)
+            all_simple_returns.append(block_simple_return)
+
+            block_simple_return = np.clip(block_simple_return, -0.9999, None)
+            block_log_return = np.log(1 + block_simple_return)  
+            all_log_returns.append(block_log_return)
+
             history = np.concatenate([history, val[start:end]])
 
-        net_returns = np.concatenate(all_returns)
-        return -sharpe_ratio(net_returns), max_drawdown(net_returns)
+        net_simple_returns = np.concatenate(all_simple_returns)
+        net_log_returns = np.concatenate(all_log_returns)
+
+        return -sharpe_ratio(net_simple_returns), max_drawdown(net_log_returns)
 
     return objective
 
@@ -85,7 +105,7 @@ class Tier1ARIMAProblem(ElementwiseProblem):
 class Tier2MOGAProblem(ElementwiseProblem):
     def __init__(self, obj_func):
         super().__init__(n_var=3, n_obj=2,
-                         xl=np.array([1, 1, 0.0]), xu=np.array([7, 7, 1.0]))
+                         xl=np.array([1, 1, 0.5]), xu=np.array([7, 7, 2.5]))
         self.obj = obj_func
 
     def _evaluate(self, x, out, *_, **__):

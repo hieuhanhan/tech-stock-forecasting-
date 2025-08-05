@@ -123,3 +123,9 @@
 2025-07-28 17:52:24,960 [INFO] Fold 136, Retrain Interval 20
 2025-07-28 17:54:40,682 [INFO] Fold 136, Retrain Interval 42
 2025-07-28 17:55:36,132 [INFO] Checkpoint saved for fold 136
+2025-08-03 10:29:29,096 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-08-03 10:29:29,097 [INFO] Found existing results file at data/tuning_results/csv/tier2_arima.csv. Resuming...
+2025-08-03 10:29:29,104 [INFO] Already processed 9 folds. Skipping them.
+2025-08-03 10:30:13,897 [INFO] Running sensitivity analysis for retrain_intervals=[10, 20, 42]
+2025-08-03 10:30:13,898 [INFO] Found existing results file at data/tuning_results/csv/tier2_arima.csv. Resuming...
+2025-08-03 10:30:13,900 [INFO] Already processed 9 folds. Skipping them.

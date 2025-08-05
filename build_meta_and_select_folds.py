@@ -9,40 +9,38 @@ from joblib import load
 from sklearn.cluster import KMeans
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import silhouette_score
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler
 
-# ===================================================================
-# 1. CONFIG & LOGGING
-# ===================================================================
+# CONFIG & LOGGING
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-DEFAULT_FOLDS_PATH = 'data/processed_folds/folds_summary_global.json'
 OUTPUT_DIR = 'data/processed_folds'
-VAL_META_PATH = os.path.join(OUTPUT_DIR, 'shared_meta')
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(VAL_META_PATH, exist_ok=True)
-os.makedirs(os.path.join(OUTPUT_DIR, 'arima'), exist_ok=True)
-os.makedirs(os.path.join(OUTPUT_DIR, 'lstm'), exist_ok=True)
+ARIMA_FOLDS_PATH = 'data/processed_folds/folds_summary_arima_nvda_cleaned.json'
+LSTM_FOLDS_PATH = 'data/processed_folds/folds_summary_lstm_nvda_cleaned.json'
+ARIMA_VAL_META_PATH = os.path.join(OUTPUT_DIR, 'arima_meta')
+LSTM_VAL_META_PATH = os.path.join(OUTPUT_DIR, 'lstm_meta')
 
-# ===================================================================
-# 2. META-FEATURE EXTRACTION
-# ===================================================================
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(ARIMA_VAL_META_PATH, exist_ok=True)
+os.makedirs(LSTM_VAL_META_PATH, exist_ok=True)
+os.makedirs(os.path.dirname(ARIMA_FOLDS_PATH), exist_ok=True)
+os.makedirs(os.path.dirname(LSTM_FOLDS_PATH), exist_ok=True)
+
+# META-FEATURE EXTRACTION
 def compute_acf(series, lag=1):
+    if len(series) <= lag or series.isnull().any():
+        return np.nan
     return series.autocorr(lag=lag)
 
 def evaluate_kmeans(X, k, model_name):
-    """Run KMeans for a given k and return model + silhouette score."""
     km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(X)
     score = silhouette_score(X, km.labels_) if len(np.unique(km.labels_)) > 1 else -1
     logging.info(f"[{model_name}] k={k}: inertia={km.inertia_:.2f}, silhouette={score:.3f}")
     return km, score, X
 
 def find_best_k(meta_df, model_name, k_min=5, k_max=25):
-    """Find k with best silhouette score."""
     if meta_df.empty:
         logging.warning(f"[{model_name}] No meta-features available for k search.")
         return k_min
@@ -56,7 +54,6 @@ def find_best_k(meta_df, model_name, k_min=5, k_max=25):
     return best_k
 
 def pick_representatives(meta_df, k, model_name, n_per_cluster=1):
-    """Cluster and pick n_per_cluster closest points per cluster."""
     if meta_df.empty:
         logging.warning(f"[{model_name}] No meta-features to cluster.")
         return pd.DataFrame(columns=['fold_id', 'ticker', 'cluster', 'cluster_size'])
@@ -76,7 +73,6 @@ def pick_representatives(meta_df, k, model_name, n_per_cluster=1):
         cluster_points = meta_df[meta_df['cluster'] == cluster_id]
         cluster_X = X_scaled[meta_df['cluster'] == cluster_id]
 
-        # Distant to centroid and pick closest folds
         center = km.cluster_centers_[cluster_id]
         dists = np.linalg.norm(cluster_X - center, axis=1)
         sorted_idx = np.argsort(dists)[:n_per_cluster]
@@ -93,68 +89,124 @@ def pick_representatives(meta_df, k, model_name, n_per_cluster=1):
 def build_meta_arima(folds_summary):
     logging.info("[ARIMA] Building meta-features...")
     meta_rows = []
+    excluded_folds = []
+
     for fold in folds_summary:
-        val_meta_path = os.path.join(VAL_META_PATH, f"val_meta_fold_{fold['global_fold_id']}.csv")
+        fold_id = fold['global_fold_id']
+        val_meta_path = os.path.join(ARIMA_VAL_META_PATH, f"val_meta_fold_{fold_id}.csv")
         if not os.path.exists(val_meta_path):
             continue
+
         df_val = pd.read_csv(val_meta_path)
+        if 'Log_Returns' not in df_val or 'target' not in df_val:
+            continue
+
         log_ret = df_val['Log_Returns'].dropna()
-        if len(log_ret) < 5:
+        if len(log_ret) < 30:
+            excluded_folds.append((fold_id, fold['ticker'], 'too_short'))
+            continue
+
+        target_mean = df_val['target'].mean()
+        if target_mean < 0.1 or target_mean > 0.6:
+            excluded_folds.append((fold_id, fold['ticker'], 'label_imbalance'))
+            continue
+
+        volatility = log_ret.std()
+        if volatility < 1e-4:
+            excluded_folds.append((fold_id, fold['ticker'], 'flat_volatility'))
+            continue
+
+        trend_slope = np.polyfit(np.arange(len(df_val['Close'])),
+                                 np.log1p(df_val['Close']), 1)[0]
+        if 'Close' not in df_val or df_val['Close'].isnull().any():
+            excluded_folds.append((fold_id, fold['ticker'], 'missing_close'))
+            continue
+
+        if abs(trend_slope) < 1e-5:
+            excluded_folds.append((fold_id, fold['ticker'], 'flat_trend'))
             continue
 
         meta_rows.append({
-            'fold_id': fold['global_fold_id'],
+            'fold_id': fold_id,
             'ticker': fold['ticker'],
-            'volatility_std': log_ret.std(),
+            'positive_ratio': target_mean,
+            'volatility_std': volatility,
             'acf1': compute_acf(log_ret, lag=1),
             'acf2': compute_acf(log_ret, lag=2),
-            'trend_slope': np.polyfit(np.arange(len(df_val['Close'])),
-                                      np.log1p(df_val['Close']), 1)[0] if len(df_val['Close']) > 1 else 0,
+            'trend_slope': trend_slope,
             'skewness': log_ret.skew(),
             'kurtosis': log_ret.kurtosis()
         })
+    if excluded_folds:
+        excluded_df = pd.DataFrame(excluded_folds, columns=['fold_id', 'ticker', 'reason'])
+        excluded_path = os.path.join(ARIMA_VAL_META_PATH, 'excluded_arima_folds.csv')
+        excluded_df.to_csv(excluded_path, index=False)
+        logging.info(f"[ARIMA] Excluded folds saved to {excluded_path}")
+
+    logging.info(f"[ARIMA] Excluded {len(excluded_folds)} folds due to imbalance or flat behavior.")
     return pd.DataFrame(meta_rows)
 
 def build_meta_lstm(folds_summary):
     logging.info("[LSTM] Building meta-features...")
 
-    # Load feature columns from global scaler metadata
-    scaler_bundle_path = 'data/scalers/global_scalers.pkl'
-    if not os.path.exists(scaler_bundle_path):
-        raise FileNotFoundError(f"[LSTM] Could not find scaler metadata at {scaler_bundle_path}")
-    
-    scaler_bundle = load(scaler_bundle_path)
-    feature_cols = scaler_bundle['feature_cols']
-    logging.info(f"[LSTM] Loaded {len(feature_cols)} feature columns from global_scalers.pkl")
-
     meta_rows = []
+    excluded_folds = []
+
     for fold in folds_summary:
-        val_path = os.path.join(OUTPUT_DIR, 'lstm', 'val', f"val_fold_{fold['global_fold_id']}.csv")
+        fold_id = fold['global_fold_id']
+        val_path = os.path.join(OUTPUT_DIR, 'lstm', 'val', f"val_fold_{fold_id}.csv")
         if not os.path.exists(val_path):
             continue
-        df_val = pd.read_csv(val_path)
 
-        features = df_val[feature_cols].copy()
-        if features.shape[1] < 2:
+        df_val = pd.read_csv(val_path)
+        if not all(col in df_val.columns for col in ['target', 'Log_Returns']):
             continue
 
-        imp = SimpleImputer(strategy='mean')
-        X = imp.fit_transform(features)
-        pca_var1 = PCA(n_components=1, random_state=42).fit(X).explained_variance_ratio_[0]
+        target_mean = df_val['target'].mean()
+        if target_mean < 0.1 or target_mean > 0.6:
+            excluded_folds.append((fold_id, fold['ticker'], 'label_imbalance'))
+            continue
 
-        meta_rows.append({
-            'fold_id': fold['global_fold_id'],
+        volatility = df_val['Log_Returns'].std()
+        if volatility < 1e-4:
+            excluded_folds.append((fold_id, fold['ticker'], 'flat_volatility'))
+            continue
+
+        pca_cols = [col for col in df_val.columns if col.startswith('pca')]
+        if len(pca_cols) == 0:
+            continue
+
+        pca_features = df_val[pca_cols].copy()
+        if pca_features.isnull().any().any():
+            continue
+
+        if 'Close' in df_val and not df_val['Close'].isnull().any():
+            trend_slope = np.polyfit(np.arange(len(df_val['Close'])),
+                                    np.log1p(df_val['Close']), 1)[0]
+        if abs(trend_slope) < 1e-5:
+            excluded_folds.append((fold_id, fold['ticker'], 'flat_trend'))
+            continue
+
+        meta = {
+            'fold_id': fold_id,
             'ticker': fold['ticker'],
-            'feature_corr_mean': np.nanmean(features.corr().abs().values),
-            'missing_rate': features.isna().mean().mean(),
-            'pca_var1': pca_var1,
-            'volatility_std': df_val['Log_Returns'].std()
-        })
+            'positive_ratio': target_mean,
+            'volatility_std': volatility
+        }
+        meta.update({col: pca_features[col].mean() for col in pca_cols})
+        meta_rows.append(meta)
+
+    if excluded_folds:
+        excluded_df = pd.DataFrame(excluded_folds, columns=['fold_id', 'ticker', 'reason'])
+        excluded_path = os.path.join(LSTM_VAL_META_PATH, 'excluded_lstm_folds.csv')
+        excluded_df.to_csv(excluded_path, index=False)
+        logging.info(f"[LSTM] Excluded folds saved to {excluded_path}")
+
+    logging.info(f"[LSTM] Excluded {len(excluded_folds)} folds due to imbalance or flat behavior.")
     return pd.DataFrame(meta_rows)
 
-# ===================================================================
-# 3. MAIN LOGIC
-# ===================================================================
+
+# MAIN 
 def main(folds_path, k_arima, k_lstm, evaluate_k, auto_k, n_per_cluster_arima, n_per_cluster_lstm):
     logging.info(f"Loading folds summary from {folds_path}...")
     with open(folds_path, 'r') as f:
@@ -184,19 +236,17 @@ def main(folds_path, k_arima, k_lstm, evaluate_k, auto_k, n_per_cluster_arima, n
     logging.info(f"[DONE] Saved LSTM folds -> {lstm_path}")
 
     # Save meta-features
-    meta_arima_path = os.path.join(VAL_META_PATH, 'meta_arima.csv')
-    meta_lstm_path = os.path.join(VAL_META_PATH, 'meta_lstm.csv')
+    meta_arima_path = os.path.join(ARIMA_VAL_META_PATH, 'meta_arima.csv')
+    meta_lstm_path = os.path.join(LSTM_VAL_META_PATH, 'meta_lstm.csv')
     meta_arima.to_csv(meta_arima_path, index=False)
     meta_lstm.to_csv(meta_lstm_path, index=False)
     logging.info(f"[SAVE] Meta ARIMA features -> {meta_arima_path}")
     logging.info(f"[SAVE] Meta LSTM features -> {meta_lstm_path}")
 
-# ===================================================================
-# 4. CLI ENTRY POINT
-# ===================================================================
+# CLI ENTRY POINT
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Select representative folds for ARIMA and LSTM.")
-    parser.add_argument("--folds_path", type=str, default=DEFAULT_FOLDS_PATH, help="Path to folds_summary.json")
+    parser.add_argument("--folds_path", type=str, required=True)
     parser.add_argument("--k_arima", type=int, default=15, help="Number of clusters for ARIMA")
     parser.add_argument("--k_lstm", type=int, default=10, help="Number of clusters for LSTM")
     parser.add_argument("--n_per_cluster_arima", type=int, default=1, help="Number of folds to pick per ARIMA cluster")
