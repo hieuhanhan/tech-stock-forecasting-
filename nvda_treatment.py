@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import argparse
 
-def analyze_nvda(fold_summary_path, model_type, path_key, output_json=True):
+def analyze_nvda(fold_summary_path, model_type, output_json=True):
     meta_dir = os.path.join("data", "processed_folds", f"{model_type}_meta")
 
     with open(fold_summary_path) as f:
@@ -26,7 +26,7 @@ def analyze_nvda(fold_summary_path, model_type, path_key, output_json=True):
         target_ratio = df['target'].mean()
 
         if model_type == 'arima':
-            close_std = df['Close'].std()
+            close_std = df['Close_raw'].std()
             if target_ratio < 0.1 or target_ratio > 0.9 or close_std < 0.005:
                 print(f"[DROP] Fold {fold['global_fold_id']} (NVDA) - target ratio: {target_ratio:.2f}, close std: {close_std:.4f}")
                 nvda_problem_folds.append(fold['global_fold_id'])
@@ -61,11 +61,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Clean NVDA folds from summary")
     parser.add_argument("--fold_summary_path", type=str, required=True)
     parser.add_argument("--model_type", type=str, required=True, choices=["lstm", "arima"])
-    parser.add_argument("--path_key", type=str, required=True)
     args = parser.parse_args()
 
     analyze_nvda(
         fold_summary_path=args.fold_summary_path,
-        model_type=args.model_type,
-        path_key=args.path_key
+        model_type=args.model_type
     )

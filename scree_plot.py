@@ -7,7 +7,7 @@ import os
 df = pd.read_csv('data/scaled/global/train_val_scaled.csv')
 
 # Exclude non-feature columns
-non_feature_cols = ['Date', 'Ticker', 'target_log_returns', 'target', 'Log_Returns']
+non_feature_cols = ['Date', 'Close_raw', 'Ticker', 'target_log_returns', 'target', 'Log_Returns']
 feature_cols = [c for c in df.columns if c not in non_feature_cols]
 X = df[feature_cols]
 

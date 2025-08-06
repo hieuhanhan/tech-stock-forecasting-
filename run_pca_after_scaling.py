@@ -17,11 +17,7 @@ df = pd.read_csv(SCALED_CSV_PATH)
 print(f"[INFO] Loaded scaled dataset with shape: {df.shape}")
 
 
-non_feature_cols = [
-    'Date', 'Ticker', 
-    'target_log_returns', 'target', 
-    'Log_Returns', 'Close_raw'
-    ]
+non_feature_cols = ['Date', 'Ticker', 'target_log_returns', 'target', 'Log_Returns', 'Close_raw']
 
 feature_cols = [col for col in df.columns if col not in non_feature_cols]
 X = df[feature_cols].copy()

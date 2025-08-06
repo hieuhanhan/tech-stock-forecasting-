@@ -22,7 +22,7 @@ STEP_SIZE = 21
 # GLOBAL SCALE BEFORE FOLDS
 def global_scale_data(df):
     print("[INFO] Fitting global scaler on full train_val data...")
-    cols_to_drop = ['Date', 'Ticker', 'target_log_returns', 'target', 'Log_Returns']
+    cols_to_drop = ['Date', 'Close_raw', 'Ticker', 'target_log_returns', 'target', 'Log_Returns']
     feature_cols = [c for c in df.columns if c not in cols_to_drop]
 
     ohlcv_cols = [c for c in feature_cols if c.startswith('Transformed_')]
@@ -67,8 +67,6 @@ def global_scale_data(df):
 if __name__ == "__main__":
     train_val_df = pd.read_csv('data/cleaned/train_val_for_wf_with_features.csv')
     train_val_df['Date'] = pd.to_datetime(train_val_df['Date'])
-
-    train_val_df['Close_raw'] = train_val_df['Close']
 
     threshold_meta_path = 'data/cleaned/target_threshold.json'
     with open(threshold_meta_path, 'r') as f:

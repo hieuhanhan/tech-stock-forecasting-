@@ -12,7 +12,6 @@ TRAIN_WINDOW_SIZE = 252
 VAL_WINDOW_SIZE = 42
 STEP_SIZE = 21
 
-
 # GENERATE FOLDS FROM SCALED DATA
 def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_size):
     all_folds_summary = []
@@ -53,7 +52,7 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
             val_file_name_prefix = f'val_fold_{global_fold_counter}'
             meta_file_name_prefix = f'val_meta_fold_{global_fold_counter}'
 
-            cols_for_arima = ['Date', 'Close', 'Log_Returns', 'Volume']
+            cols_for_arima = ['Date', 'Close_raw', 'Log_Returns', 'Volume']
             missing_arima_cols = [col for col in cols_for_arima if col not in train_data.columns]
                 
             if train_data[cols_for_arima].isnull().values.any() or val_data[cols_for_arima].isnull().values.any():
@@ -68,7 +67,7 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
                 val_data[cols_for_arima].to_csv(
                     os.path.join(model_dirs['arima']['val'], f'{val_file_name_prefix}.csv'), index=False)
             
-            val_data[['Date', 'Close', 'Ticker', 'Log_Returns', 'target_log_returns', 'target']].to_csv(
+            val_data[['Date', 'Close_raw', 'Ticker', 'Log_Returns', 'target_log_returns', 'target']].to_csv(
                 os.path.join(model_dirs['meta_dir_path'], f'{meta_file_name_prefix}.csv'), index=False)
             
             val_pos_ratio = val_data['target'].mean()
@@ -78,7 +77,8 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
                 'global_fold_id': global_fold_counter,
                 'ticker': ticker,
                 'train_path_arima': os.path.join('arima', 'train', f'{train_file_name_prefix}.csv'),
-                'val_path_arima': os.path.join('arima', 'val', f'{val_file_name_prefix}.csv')
+                'val_path_arima': os.path.join('arima', 'val', f'{val_file_name_prefix}.csv'),
+                'val_meta_path_arima': os.path.join('arima_meta', f'{meta_file_name_prefix}.csv')
                 })
             global_fold_counter += 1
             folds_created += 1

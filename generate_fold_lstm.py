@@ -82,7 +82,8 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
                 'global_fold_id': global_fold_counter,
                 'ticker': ticker,
                 'train_path_lstm': os.path.join('lstm', 'train', f'{train_file_name_prefix}.csv'),
-                'val_path_lstm': os.path.join('lstm', 'val', f'{val_file_name_prefix}.csv')
+                'val_path_lstm': os.path.join('lstm', 'val', f'{val_file_name_prefix}.csv'),
+                'val_meta_path_lstm': os.path.join('lstm_meta', f'{meta_file_name_prefix}.csv')
             })
             global_fold_counter += 1
             folds_created += 1
