@@ -5,6 +5,8 @@ from sklearn.impute import SimpleImputer
 import logging
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from collections import defaultdict
+
 
 def compute_trend_slope(close_series):
     if close_series.isnull().any():
@@ -13,7 +15,7 @@ def compute_trend_slope(close_series):
         return np.polyfit(np.arange(len(close_series)), np.log1p(close_series), 1)[0]
     except Exception:
         return np.nan
-    
+
 def compute_acf(series, lag=1):
     if len(series) <= lag or series.isnull().any():
         return np.nan
@@ -52,7 +54,7 @@ def evaluate_kmeans(X, k, model_name):
 def find_best_k(meta_df, model_name, k_min=5, k_max=25):
     if meta_df.empty:
         logging.warning(f"[{model_name}] No meta-features available for k search.")
-        return k_min
+        return k_min, None
 
     imputer = SimpleImputer(strategy='mean')
     X = imputer.fit_transform(meta_df.drop(columns=['fold_id', 'ticker']))
@@ -63,18 +65,14 @@ def find_best_k(meta_df, model_name, k_min=5, k_max=25):
         if score > best_score:
             best_k, best_score = k, score
     logging.info(f"[{model_name}] Best k={best_k} with silhouette={best_score:.3f}")
-    return best_k
+    return best_k, X
 
-def pick_representatives(meta_df, k, model_name, n_per_cluster=1):
+def pick_representatives(meta_df, X, k, model_name, n_per_cluster=1):
     if meta_df.empty:
         logging.warning(f"[{model_name}] No meta-features to cluster.")
-        return pd.DataFrame(columns=['fold_id', 'ticker', 'cluster', 'cluster_size', 'distance_to_centroid']), meta_df
+        return pd.DataFrame(columns=['fold_id', 'ticker', 'cluster', 'cluster_size', 'distance_to_centroid']), meta_df, X, []
 
-    imputer = SimpleImputer(strategy='mean')
-    feature_cols = meta_df.drop(columns=['fold_id', 'ticker'], errors='ignore')
-    X_scaled = imputer.fit_transform(feature_cols)
-
-    km, score, _ = evaluate_kmeans(X_scaled, k, model_name)
+    km, score, _ = evaluate_kmeans(X, k, model_name)
 
     if score < 0.3:
         logging.warning(f"[{model_name}] Silhouette < 0.3 → Consider increasing k or n_per_cluster.")
@@ -83,21 +81,23 @@ def pick_representatives(meta_df, k, model_name, n_per_cluster=1):
     meta_df['cluster'] = km.labels_
     meta_df['cluster_size'] = meta_df.groupby('cluster')['cluster'].transform('count')
 
+    meta_dists = []
+    for idx, row in meta_df.iterrows():
+        fold_id = row['fold_id']
+        vec = X[idx]
+        centroid = km.cluster_centers_[row['cluster']]
+        dist = np.linalg.norm(vec - centroid)
+        meta_dists.append(dist)
+    meta_df['distance_to_centroid'] = meta_dists
+
     reps = []
     for cluster_id in range(k):
-        cluster_points = meta_df[meta_df['cluster'] == cluster_id]
-        cluster_X = X_scaled[meta_df['cluster'] == cluster_id]
-
-        center = km.cluster_centers_[cluster_id]
-        dists = np.linalg.norm(cluster_X - center, axis=1)
-        cluster_points = cluster_points.copy()
-        cluster_points['distance_to_centroid'] = dists
-
-        sorted_idx = np.argsort(dists)[:n_per_cluster]
-        reps.append(cluster_points.iloc[sorted_idx])
+        cluster_points = meta_df[meta_df['cluster'] == cluster_id].copy()
+        sorted_df = cluster_points.sort_values('distance_to_centroid').head(n_per_cluster)
+        reps.append(sorted_df)
 
     reps_df = pd.concat(reps).reset_index(drop=True)
-    return reps_df, meta_df
+    return reps_df, meta_df, X, km.cluster_centers_
 
 def load_and_filter_val_fold(val_meta_path, model_type):
     if not os.path.exists(val_meta_path):
@@ -127,67 +127,94 @@ def load_and_filter_val_fold(val_meta_path, model_type):
 
     return df_val, None
 
-def refine_representative_folds(reps_df, meta_df, distance_threshold=0.8, force_distance_limit=50.0):
+def select_top_folds_no_cluster_overlap(df, n_per_ticker=2):
+    result_rows = []
+    for ticker, group in df.groupby('ticker'):
+        seen_clusters = set()
+        ticker_rows = []
+        for _, row in group.sort_values('distance_to_centroid').iterrows():
+            if row['cluster'] not in seen_clusters:
+                ticker_rows.append(row)
+                seen_clusters.add(row['cluster'])
+            if len(ticker_rows) >= n_per_ticker:
+                break
+        result_rows.extend(ticker_rows)
+    return pd.DataFrame(result_rows)
+
+def refine_representative_folds(
+    reps_df,
+    meta_df,
+    X,
+    cluster_centers,
+    fold_id_to_index,
+    distance_threshold=0.8,
+    force_distance_limit=30.0,
+    max_forced_per_cluster=1,
+    n_per_ticker=2,
+    global_weighting=True
+):
+
     desired_tickers = {"AAPL", "AMZN", "GOOGL", "META", "MSFT", "NVDA", "TSLA"}
 
-    reps_df = reps_df[reps_df['distance_to_centroid'] <= distance_threshold].copy()
-    reps_df['forced'] = False
-    selected_tickers = set(reps_df['ticker'].unique())
+    meta_df_temp = meta_df.copy()
+    meta_dists = []
+    for _, row in meta_df_temp.iterrows():
+        fold_id = row['fold_id']
+        if fold_id in fold_id_to_index:
+            vec = X[fold_id_to_index[fold_id]]
+            centroid = cluster_centers[row['cluster']]
+            dist = np.linalg.norm(vec - centroid)
+            meta_dists.append(dist)
+        else:
+            meta_dists.append(np.nan)
+    meta_df_temp['distance_to_centroid'] = meta_dists
+
+    initial_reps = reps_df[reps_df['distance_to_centroid'] <= distance_threshold].copy()
+    initial_reps['forced'] = False
+    initial_reps['is_initial'] = True
+
+    cluster_initial_count = initial_reps.groupby('cluster').size().to_dict()
+    cluster_forced_count = defaultdict(int)
+
+    selected_tickers = set(initial_reps['ticker'].unique())
+    all_reps = [initial_reps]
 
     missing_tickers = desired_tickers - selected_tickers
-    additions = []
 
     for ticker in missing_tickers:
         candidates = meta_df[meta_df['ticker'] == ticker].copy()
+        candidates = candidates.sort_values('distance_to_centroid')
 
-        if 'distance_to_centroid' not in candidates.columns:
-            imputer = SimpleImputer(strategy='mean')
-            X = imputer.fit_transform(candidates.drop(columns=['fold_id', 'ticker'], errors='ignore'))
-            center = X.mean(axis=0)
-            distances = np.linalg.norm(X - center, axis=1)
-            candidates['distance_to_centroid'] = distances
+        for _, cand in candidates.iterrows():
+            cluster_id = cand['cluster']
+            dist = cand['distance_to_centroid']
 
-        if not candidates.empty:
-            best = candidates.sort_values('distance_to_centroid').iloc[0]
-            best = best.copy()
+            if dist <= force_distance_limit and cluster_forced_count[cluster_id] < max_forced_per_cluster:
+                new_fold = cand.copy()
+                new_fold['forced'] = True
+                new_fold['is_initial'] = False
+                all_reps.append(pd.DataFrame([new_fold]))
+                cluster_forced_count[cluster_id] += 1
+                logging.warning(f"[forced] Added {ticker} from cluster {cluster_id} with distance {dist:.3f}")
+                break
 
-            if best['distance_to_centroid'] > distance_threshold:
-                if best['distance_to_centroid'] <= force_distance_limit:
-                    logging.warning(f"[forced] Added {ticker} with distance {best['distance_to_centroid']:.3f} > threshold but within force limit")
-                    best['forced'] = True
-                    additions.append(best)
-                else:
-                    logging.warning(f"[refine] Skipping {ticker} due to distance {best['distance_to_centroid']:.3f} > force limit ({force_distance_limit})")
-            else:
-                best['forced'] = False
-                additions.append(best)
+    reps_df = pd.concat(all_reps, ignore_index=True)
+    reps_df = select_top_folds_no_cluster_overlap(reps_df, n_per_ticker=n_per_ticker)
 
-    if additions:
-        reps_df = pd.concat([reps_df, pd.DataFrame(additions)], ignore_index=True)
-
-        reps_df = (
-            reps_df.sort_values(by='distance_to_centroid')
-                   .groupby('ticker', as_index=False)
-                   .head(2)
-        )
-
-    if 'cluster' not in meta_df.columns or 'cluster_size' not in meta_df.columns:
-        logging.warning("[refine] 'cluster' or 'cluster_size' missing in meta_df → skipping cluster merge")
-        cluster_info = pd.DataFrame(columns=['fold_id', 'cluster', 'cluster_size'])
+    if global_weighting:
+        all_dists = meta_df['distance_to_centroid']
+        min_dist = all_dists.min()
+        max_dist = all_dists.max()
     else:
-        cluster_info = meta_df[['fold_id', 'cluster', 'cluster_size']]
+        min_dist = reps_df['distance_to_centroid'].min()
+        max_dist = reps_df['distance_to_centroid'].max()
 
-    reps_df = reps_df.drop(columns=['cluster', 'cluster_size'], errors='ignore')
-    reps_df = reps_df.merge(cluster_info, on='fold_id', how='left')
+    if max_dist == min_dist:
+        reps_df['weight'] = 1.0
+    else:
+        reps_df['weight'] = reps_df['distance_to_centroid'].apply(
+            lambda d: 1.0 - (d - min_dist) / (max_dist - min_dist + 1e-6)
+        )
+    reps_df.loc[reps_df['forced'], 'weight'] *= 0.5
 
-    if 'forced' not in reps_df.columns:
-        reps_df['forced'] = False
-    
-    max_dist = reps_df['distance_to_centroid'].max()
-    min_dist = reps_df['distance_to_centroid'].min()
-    reps_df['weight'] = reps_df['distance_to_centroid'].apply(
-        lambda d: 1.0 - (d - min_dist) / (max_dist - min_dist + 1e-6))
-    
-    reps_df.loc[reps_df['forced'], 'weight'] *= 0.5  
-
-    return reps_df[['fold_id', 'ticker', 'cluster', 'cluster_size', 'distance_to_centroid', 'forced', 'weight']].sort_values(by=['ticker'])
+    return reps_df[['fold_id', 'ticker', 'cluster', 'cluster_size', 'distance_to_centroid', 'forced', 'weight']].sort_values(by=['ticker', 'fold_id'])
