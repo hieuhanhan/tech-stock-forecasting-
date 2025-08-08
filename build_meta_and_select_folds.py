@@ -144,11 +144,8 @@ def main(arima_folds_path, lstm_folds_path, k_arima, k_lstm, evaluate_k, auto_k,
     logging.info(f"[ARIMA] {len(arima_reps_refined_no_overlap)} folds selected. Tickers: {sorted(arima_reps_refined_no_overlap['ticker'].unique())}")
     logging.info(f"[LSTM] {len(lstm_reps_refined_no_overlap)} folds selected. Tickers: {sorted(lstm_reps_refined_no_overlap['ticker'].unique())}")
 
-    meta_arima_with_cluster_final = meta_arima.merge(arima_reps_refined_no_overlap[['fold_id', 'cluster', 'cluster_size']], on='fold_id', how='left')
-    meta_lstm_with_cluster_final = meta_lstm.merge(lstm_reps_refined_no_overlap[['fold_id', 'cluster', 'cluster_size']], on='fold_id', how='left')
-
-    meta_arima_with_cluster_final.to_csv(os.path.join(arima_val_meta_path, 'meta_arima.csv'), index=False)
-    meta_lstm_with_cluster_final.to_csv(os.path.join(lstm_val_meta_path, 'meta_lstm.csv'), index=False)
+    meta_arima_with_cluster.to_csv(os.path.join(arima_val_meta_path, 'meta_arima_full_with_clusters.csv'), index=False)
+    meta_lstm_with_cluster.to_csv(os.path.join(lstm_val_meta_path, 'meta_lstm_full_with_clusters.csv'), index=False)
 
 # CLI
 if __name__ == "__main__":

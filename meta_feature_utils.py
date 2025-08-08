@@ -21,11 +21,12 @@ def compute_acf(series, lag=1):
         return np.nan
     return series.autocorr(lag=lag)
 
-def compute_meta_statistics(df_val):
+def compute_meta_statistics(df_val, rolling_window=21):
     log_ret = df_val['Log_Returns'].dropna()
-    return {
+
+    meta = {
         'positive_ratio': df_val['target'].mean(),
-        'volatility_std': log_ret.std(),
+        'volatility_std': log_ret.std(),  
         'acf1': log_ret.autocorr(lag=1) if len(log_ret) > 1 else np.nan,
         'acf2': log_ret.autocorr(lag=2) if len(log_ret) > 2 else np.nan,
         'trend_slope': compute_trend_slope(df_val['Close_raw']),
@@ -33,16 +34,41 @@ def compute_meta_statistics(df_val):
         'kurtosis': log_ret.kurtosis()
     }
 
-def compute_meta_with_pca(df_val):
+    if len(log_ret) >= rolling_window:
+        rolling_vol = log_ret.rolling(window=rolling_window).std()
+        meta['rolling_vol_mean'] = rolling_vol.mean()
+        meta['rolling_vol_max'] = rolling_vol.max()
+    else:
+        meta['rolling_vol_mean'] = np.nan
+        meta['rolling_vol_max'] = np.nan
+
+    return meta
+
+def compute_meta_with_pca(df_val, rolling_window=21):
+    log_ret = df_val['Log_Returns'].dropna()
+    
+    # Base statistics
     meta = {
         'positive_ratio': df_val['target'].mean(),
-        'volatility_std': df_val['Log_Returns'].std(),
-        'trend_slope': compute_trend_slope(df_val['Close_raw'])
+        'volatility_std': log_ret.std(),
+        'trend_slope': compute_trend_slope(df_val['Close_raw']),
     }
+
+    # Rolling volatility
+    if len(log_ret) >= rolling_window:
+        rolling_vol = log_ret.rolling(window=rolling_window).std()
+        meta['rolling_vol_mean'] = rolling_vol.mean()
+        meta['rolling_vol_max'] = rolling_vol.max()
+    else:
+        meta['rolling_vol_mean'] = np.nan
+        meta['rolling_vol_max'] = np.nan
+
+    # PCA-based features
     for col in df_val.columns:
         if col.startswith("PC") and not df_val[col].isnull().values.any():
             meta[f'{col}_mean'] = df_val[col].mean()
             meta[f'{col}_std'] = df_val[col].std()
+
     return meta
 
 def evaluate_kmeans(X, k, model_name):
@@ -129,6 +155,8 @@ def load_and_filter_val_fold(val_meta_path, model_type):
 
 def select_top_folds_no_cluster_overlap(df, n_per_ticker=2):
     result_rows = []
+    MAX_PER_CLUSTER = {0: 3,  1: 1, 4: 1}
+
     for ticker, group in df.groupby('ticker'):
         seen_clusters = set()
         ticker_rows = []
@@ -148,7 +176,7 @@ def refine_representative_folds(
     cluster_centers,
     fold_id_to_index,
     distance_threshold=0.8,
-    force_distance_limit=30.0,
+    force_distance_limit=3.0,
     max_forced_per_cluster=1,
     n_per_ticker=2,
     global_weighting=True
