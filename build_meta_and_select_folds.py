@@ -5,13 +5,11 @@ import argparse
 import logging
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
 from sklearn.impute import SimpleImputer
 from meta_feature_utils import (
     load_and_filter_val_fold,
     compute_meta_statistics,
     compute_meta_with_pca,
-    evaluate_kmeans,
     find_best_k,
     pick_representatives,
     refine_representative_folds,
@@ -32,7 +30,13 @@ def build_meta_arima(folds_summary, arima_val_meta_path):
         fold_id = fold['global_fold_id']
         val_path = os.path.join(arima_val_meta_path, f"val_meta_fold_{fold_id}.csv")
 
-        df_val, reason = load_and_filter_val_fold(val_path, model_type='arima')
+        df_val, reason = load_and_filter_val_fold(
+            val_path,
+            model_type='arima',
+            min_pos=0.05, max_pos=0.70,
+            min_vol=5e-5, min_abs_slope=1e-6,
+            soft=False
+        )
         if df_val is None:
             excluded_folds.append((fold_id, fold['ticker'], reason))
             continue
@@ -55,7 +59,14 @@ def build_meta_lstm(folds_summary, lstm_val_meta_path):
     for fold in folds_summary:
         fold_id = fold['global_fold_id']
         val_path = os.path.join(lstm_val_meta_path, f"val_meta_fold_{fold_id}.csv")
-        df_val, reason = load_and_filter_val_fold(val_path, model_type='lstm')
+        df_val, reason = load_and_filter_val_fold(
+            val_path,
+            model_type='lstm',
+            min_pos=0.05, max_pos=0.70,
+            min_vol=5e-5, min_abs_slope=1e-6,
+            soft=False
+        )
+        meta = compute_meta_with_pca(df_val, top_k_pcs=10)
         if df_val is None:
             excluded_folds.append((fold_id, fold['ticker'], reason))
             continue
@@ -71,7 +82,7 @@ def build_meta_lstm(folds_summary, lstm_val_meta_path):
     return pd.DataFrame(meta_rows)
 
 def main(arima_folds_path, lstm_folds_path, k_arima, k_lstm, evaluate_k, auto_k, n_per_ticker_arima, n_per_ticker_lstm, output_dir):
-    n_per_cluster_arima = n_per_ticker_arima * 2 
+    n_per_cluster_arima = n_per_ticker_arima * 2
     n_per_cluster_lstm = n_per_ticker_lstm * 2
 
     arima_val_meta_path = os.path.join(output_dir, 'arima_meta')
@@ -108,44 +119,52 @@ def main(arima_folds_path, lstm_folds_path, k_arima, k_lstm, evaluate_k, auto_k,
         X_arima = imputer.fit_transform(meta_arima.drop(columns=['fold_id', 'ticker']))
         X_lstm = imputer.fit_transform(meta_lstm.drop(columns=['fold_id', 'ticker']))
 
-    fold_id_to_index_arima = {fold_id: idx for idx, fold_id in enumerate(meta_arima['fold_id'])}
-    fold_id_to_index_lstm = {fold_id: idx for idx, fold_id in enumerate(meta_lstm['fold_id'])}
-
-    arima_reps, meta_arima_with_cluster, X_arima, arima_centers = pick_representatives(meta_arima, X_arima, k_arima, "ARIMA", n_per_cluster=n_per_cluster_arima)
-    lstm_reps, meta_lstm_with_cluster, X_lstm, lstm_centers = pick_representatives(meta_lstm, X_lstm, k_lstm, "LSTM", n_per_cluster=n_per_cluster_lstm)
+    arima_reps, meta_arima_with_cluster, X_arima, arima_centers = pick_representatives(
+        meta_arima, X_arima, k_arima, "ARIMA", n_per_cluster=n_per_cluster_arima
+    )
+    lstm_reps, meta_lstm_with_cluster, X_lstm, lstm_centers = pick_representatives(
+        meta_lstm, X_lstm, k_lstm, "LSTM", n_per_cluster=n_per_cluster_lstm
+    )
 
     arima_reps_refined = refine_representative_folds(
         reps_df=arima_reps,
         meta_df=meta_arima_with_cluster,
         X=X_arima,
         cluster_centers=arima_centers,
-        fold_id_to_index=fold_id_to_index_arima,
-        n_per_ticker=n_per_ticker_arima 
+        n_per_ticker=n_per_ticker_arima
     )
 
-    arima_reps_refined_no_overlap = select_top_folds_no_cluster_overlap(arima_reps_refined, n_per_ticker=n_per_ticker_arima)
+    arima_reps_refined_no_overlap = select_top_folds_no_cluster_overlap(
+        arima_reps_refined, n_per_ticker=n_per_ticker_arima
+    )
 
     lstm_reps_refined = refine_representative_folds(
         reps_df=lstm_reps,
         meta_df=meta_lstm_with_cluster,
         X=X_lstm,
         cluster_centers=lstm_centers,
-        fold_id_to_index=fold_id_to_index_lstm,
-        n_per_ticker=n_per_ticker_lstm 
+        n_per_ticker=n_per_ticker_lstm
     )
-
-    lstm_reps_refined_no_overlap = select_top_folds_no_cluster_overlap(lstm_reps_refined, n_per_ticker=n_per_ticker_lstm)
+    lstm_reps_refined_no_overlap = select_top_folds_no_cluster_overlap(
+        lstm_reps_refined, n_per_ticker=n_per_ticker_lstm
+    )
 
     arima_path = os.path.join(output_dir, 'arima', 'arima_tuning_folds.json')
     lstm_path = os.path.join(output_dir, 'lstm', 'lstm_tuning_folds.json')
     arima_reps_refined_no_overlap.to_json(arima_path, orient='records', indent=4)
     lstm_reps_refined_no_overlap.to_json(lstm_path, orient='records', indent=4)
 
-    logging.info(f"[ARIMA] {len(arima_reps_refined_no_overlap)} folds selected. Tickers: {sorted(arima_reps_refined_no_overlap['ticker'].unique())}")
-    logging.info(f"[LSTM] {len(lstm_reps_refined_no_overlap)} folds selected. Tickers: {sorted(lstm_reps_refined_no_overlap['ticker'].unique())}")
-
-    meta_arima_with_cluster.to_csv(os.path.join(arima_val_meta_path, 'meta_arima_full_with_clusters.csv'), index=False)
-    meta_lstm_with_cluster.to_csv(os.path.join(lstm_val_meta_path, 'meta_lstm_full_with_clusters.csv'), index=False)
+    logging.info(f"[ARIMA] {len(arima_reps_refined_no_overlap)} folds selected. "
+                 f"Tickers: {sorted(arima_reps_refined_no_overlap['ticker'].unique())}")
+    logging.info(f"[LSTM] {len(lstm_reps_refined_no_overlap)} folds selected. "
+                 f"Tickers: {sorted(lstm_reps_refined_no_overlap['ticker'].unique())}")
+    
+    meta_arima_with_cluster.to_csv(
+        os.path.join(arima_val_meta_path, 'meta_arima_full_with_clusters.csv'), index=False
+    )
+    meta_lstm_with_cluster.to_csv(
+        os.path.join(lstm_val_meta_path, 'meta_lstm_full_with_clusters.csv'), index=False
+    )
 
 # CLI
 if __name__ == "__main__":

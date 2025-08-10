@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 from sklearn.decomposition import PCA
 
 # ------------------------------------------------------------
@@ -46,30 +46,52 @@ def scale_standard(X, **kwargs):
     scaler = StandardScaler()
     return scaler.fit_transform(X), {"type": "standard"}
 
+def scale_robust(X, **kwargs):
+    scaler = RobustScaler()
+    return scaler.fit_transform(X), {"type": "robust"}
+
 def scale_standard_pca(X, pca_var=0.9, **kwargs):
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
     pca = PCA(n_components=pca_var, random_state=42)
     Xp = pca.fit_transform(Xs)
-    return Xp, {"type": "standard+pca", "pca_var": pca_var, "n_components": pca.n_components_}
+    return Xp, {"type": "standard+pca", "pca_var": pca_var, "n_components": int(pca.n_components_)}
 
 SCALERS = {
     "raw": scale_raw,
     "minmax": scale_minmax,
     "standard": scale_standard,
+    "robust": scale_robust,
     "standard_pca": scale_standard_pca,
 }
 
-def try_kmeans(X: np.ndarray, k: int) -> tuple[float, float]:
-    """Return (silhouette, inertia). If silhouette can't be computed -> -1."""
-    if X.shape[0] <= k or k < 2:
-        return -1.0, np.nan
-    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+def try_kmeans(X: np.ndarray, k: int, min_cluster_size: int = 3) -> dict:
+    """
+    Fit KMeans(k) and return a dict of metrics.
+    If silhouette can't be computed or cluster sizes are too small, silhouette = -1.
+    """
+    n = X.shape[0]
+    if k < 2 or n <= k:
+        return {"silhouette": -1.0, "inertia": np.nan, "db": np.nan, "ch": np.nan, "valid": False}
+
+    km = KMeans(n_clusters=k, random_state=42, n_init=50)
     labels = km.fit_predict(X)
-    if len(np.unique(labels)) < 2:
-        return -1.0, km.inertia_
+
+    uniques, counts = np.unique(labels, return_counts=True)
+    if len(uniques) < 2 or counts.min() < min_cluster_size:
+        return {"silhouette": -1.0, "inertia": float(km.inertia_), "db": np.nan, "ch": np.nan, "valid": False}
+
     sil = silhouette_score(X, labels)
-    return sil, km.inertia_
+    try:
+        db = davies_bouldin_score(X, labels)
+    except Exception:
+        db = np.nan
+    try:
+        ch = calinski_harabasz_score(X, labels)
+    except Exception:
+        ch = np.nan
+
+    return {"silhouette": float(sil), "inertia": float(km.inertia_), "db": db, "ch": ch, "valid": True}
 
 # ------------------------------------------------------------
 # Main
@@ -85,6 +107,12 @@ def run(meta_path: str,
 
     meta_df = load_meta(meta_path)
     X = prepare_X(meta_df)
+    n = X.shape[0]
+
+    # cap k so average cluster size >= 3
+    k_cap = min(k_max, max(k_min, n // 3 if n >= 9 else max(2, n // 2)))
+    if k_cap < k_min:
+        k_cap = k_min
 
     results = []
 
@@ -92,25 +120,30 @@ def run(meta_path: str,
         logging.info(f"[{model_name}] Evaluating scaler='{scaler_name}' ...")
         X_scaled, scaler_info = scaler_fn(X, pca_var=pca_var)
 
-        for k in range(k_min, k_max + 1):
-            sil, inertia = try_kmeans(X_scaled, k)
-            results.append({
+        for k in range(k_min, k_cap + 1):
+            mets = try_kmeans(X_scaled, k, min_cluster_size=3)
+            row = {
                 "model": model_name,
                 "scaler": scaler_name,
                 "k": k,
-                "silhouette": sil,
-                "inertia": inertia,
-                **scaler_info
-            })
-            logging.info(f"[{model_name}] scaler={scaler_name:14s} k={k:2d} "
-                         f"sil={sil: .4f} inertia={inertia: .2f}")
+                **scaler_info,
+                **mets
+            }
+            results.append(row)
+            logging.info(
+                f"[{model_name}] scaler={scaler_name:14s} k={k:2d} "
+                f"sil={row['silhouette']: .4f} db={row['db'] if not np.isnan(row['db']) else np.nan} "
+                f"ch={row['ch'] if not np.isnan(row['ch']) else np.nan} inertia={row['inertia']: .2f}"
+            )
 
     res_df = pd.DataFrame(results)
 
-    # choose best by max silhouette, tie-breaker = min inertia, then smaller k
+    # choose best: silhouette desc → DB asc → CH desc → inertia asc → k asc
     best = (res_df
-            .sort_values(by=["silhouette", "inertia", "k"],
-                         ascending=[False, True, True])
+            .sort_values(
+                by=["silhouette", "db", "ch", "inertia", "k"],
+                ascending=[False, True, False, True, True]
+            )
             .iloc[0]
             .to_dict())
 
@@ -119,17 +152,19 @@ def run(meta_path: str,
     best_json = os.path.join(out_dir, f"{model_name}_best_scaler_k.json")
     res_df.to_csv(all_csv, index=False)
     with open(best_json, "w") as f:
-        json.dump(best, f, indent=2)
+        json.dump({k: (float(v) if isinstance(v, (np.floating, np.integer)) else v) for k, v in best.items()}, f, indent=2)
 
     logging.info(f"[{model_name}] Saved all results -> {all_csv}")
     logging.info(f"[{model_name}] Best config      -> {best_json}")
-    logging.info(f"[{model_name}] BEST => scaler={best['scaler']} | k={best['k']} | "
-                 f"silhouette={best['silhouette']:.4f}")
+    logging.info(
+        f"[{model_name}] BEST => scaler={best['scaler']} | k={int(best['k'])} | "
+        f"silhouette={best['silhouette']:.4f} | db={best['db']} | ch={best['ch']}"
+    )
 
     return res_df, best
 
 def main():
-    parser = argparse.ArgumentParser("Auto pick (scaler, k) by silhouette")
+    parser = argparse.ArgumentParser("Auto pick (scaler, k) by multiple cluster metrics")
     parser.add_argument("--meta-file", required=True,
                         help="Path to meta_arima.csv or meta_lstm.csv")
     parser.add_argument("--out-dir", default="data/processed_folds/auto_k",

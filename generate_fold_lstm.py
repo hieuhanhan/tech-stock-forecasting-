@@ -10,6 +10,7 @@ GLOBAL_SCALED_PATH = os.path.join(BASE_DIR, 'scaled', 'global')
 PCA_SCALED_PATH = os.path.join(GLOBAL_SCALED_PATH, 'train_val_scaled_pca.csv')
 SCALER_OUTPUT_PATH = os.path.join(GLOBAL_SCALED_PATH, 'scalers.pkl')
 SCALER_META_PATH = os.path.join(GLOBAL_SCALED_PATH, 'scaler_meta.json')
+LSTM_FEATURE_COLUMNS_PATH = os.path.join(OUTPUT_BASE_DIR, 'lstm_feature_columns.json')
 
 os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
 os.makedirs(GLOBAL_SCALED_PATH, exist_ok=True)
@@ -19,10 +20,12 @@ TRAIN_WINDOW_SIZE = 252
 VAL_WINDOW_SIZE = 42
 STEP_SIZE = 21
 
+
 # GENERATE FOLDS FROM SCALED DATA
 def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_size):
     all_folds_summary = []
     global_fold_counter = 0
+    feature_columns_locked = None
 
     model_dirs = {
         'lstm': {'train': os.path.join(OUTPUT_BASE_DIR, 'lstm', 'train'),
@@ -42,7 +45,6 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
             print(f"[WARN] Skipping {ticker} due to insufficient data")
             continue
 
-        folds_created = 0
         max_start_idx = len(ticker_df) - (train_window_size + val_window_size)
         for fold_start_idx in range(0, max_start_idx + 1, step_size):
             train_end_idx = fold_start_idx + train_window_size
@@ -64,29 +66,47 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
 
             cols_for_lstm = [c for c in train_data.columns if c not in ['target_log_returns']]
 
-            if train_data[cols_for_lstm].isnull().values.any() or val_data[cols_for_lstm].isnull().values.any():
-                print(f"[WARN] NaNs found in LSTM data for fold {global_fold_counter}, skipping.")
-                continue
+            if feature_columns_locked is None:
+                feature_columns_locked = [c for c in cols_for_lstm if c not in ['target', 'Date', 'Ticker', 'Close_raw']]
+                with open(LSTM_FEATURE_COLUMNS_PATH, 'w') as f:
+                    json.dump(feature_columns_locked, f, indent=2)
+                print(f"[INFO] Locked LSTM feature columns ({len(feature_columns_locked)}): {LSTM_FEATURE_COLUMNS_PATH}")
 
-            train_data[cols_for_lstm].to_csv(
-                os.path.join(model_dirs['lstm']['train'], f'{train_file_name_prefix}.csv'), index=False)
-            val_data[cols_for_lstm].to_csv(
-                os.path.join(model_dirs['lstm']['val'], f'{val_file_name_prefix}.csv'), index=False)
-            val_data.to_csv(
-                os.path.join(model_dirs['meta_dir_path'], f'{meta_file_name_prefix}.csv'), index=False)
+            if train_data[feature_columns_locked].isnull().values.any() or val_data[feature_columns_locked].isnull().values.any():
+                print(f"[WARN] NaNs found in features for fold {global_fold_counter}, skipping.")
+                continue
             
-            val_pos_ratio = val_data['target'].mean()
-            print(f"  Fold {global_fold_counter}: {ticker} - val positive label ratio: {val_pos_ratio:.2%}")
+            val_pos_ratio = float(val_data['target'].mean()) if 'target' in val_data.columns else None
+            val_vol = float(val_data['Log_Returns'].std()) if 'Log_Returns' in val_data.columns else None
+
+            train_out_path = os.path.join(model_dirs['lstm']['train'], f'{train_file_name_prefix}.csv')
+            val_out_path   = os.path.join(model_dirs['lstm']['val'],   f'{val_file_name_prefix}.csv')
+            meta_out_path  = os.path.join(model_dirs['meta_dir_path'], f'{meta_file_name_prefix}.csv')
+
+            train_data[cols_for_lstm].to_csv(train_out_path, index=False)
+            val_data[cols_for_lstm].to_csv(val_out_path, index=False)
+            val_data.to_csv(meta_out_path, index=False)
+
+            train_rel = os.path.relpath(train_out_path, OUTPUT_BASE_DIR)
+            val_rel   = os.path.relpath(val_out_path,   OUTPUT_BASE_DIR)
+            meta_rel  = os.path.relpath(meta_out_path,  OUTPUT_BASE_DIR)
+
             
             all_folds_summary.append({
                 'global_fold_id': global_fold_counter,
                 'ticker': ticker,
-                'train_path_lstm': os.path.join('lstm', 'train', f'{train_file_name_prefix}.csv'),
-                'val_path_lstm': os.path.join('lstm', 'val', f'{val_file_name_prefix}.csv'),
-                'val_meta_path_lstm': os.path.join('lstm_meta', f'{meta_file_name_prefix}.csv')
+                'train_path_lstm': train_rel,
+                'val_path_lstm': val_rel,
+                'val_meta_path_lstm': meta_rel,
+                'train_start': train_data['Date'].iloc[0],
+                'train_end': train_data['Date'].iloc[-1],
+                'val_start': val_data['Date'].iloc[0],
+                'val_end': val_data['Date'].iloc[-1],
+                'val_pos_ratio': val_pos_ratio,
+                'val_vol': val_vol
             })
+
             global_fold_counter += 1
-            folds_created += 1
 
     with open(os.path.join(OUTPUT_BASE_DIR, 'folds_summary_lstm.json'), 'w') as f:
         json.dump(all_folds_summary, f, indent=4)
@@ -97,11 +117,5 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
 if __name__ == "__main__":
     pca_scaled_df = pd.read_csv(PCA_SCALED_PATH)
     pca_scaled_df['Date'] = pd.to_datetime(pca_scaled_df['Date'])
-
-    threshold_meta_path = 'data/cleaned/target_threshold.json'
-    with open(threshold_meta_path, 'r') as f:
-        threshold_meta = json.load(f)
-    threshold = threshold_meta['threshold']
-    print(f"[INFO] Loaded threshold from preprocessing: {threshold:.4f} (quantile: {threshold_meta['quantile']})")
 
     generate_folds(pca_scaled_df, TRAIN_WINDOW_SIZE, VAL_WINDOW_SIZE, STEP_SIZE)
