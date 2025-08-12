@@ -7,7 +7,7 @@ import pandas as pd
 BASE_DIR = 'data'
 OUTPUT_BASE_DIR = os.path.join(BASE_DIR, 'processed_folds')
 GLOBAL_SCALED_PATH = os.path.join(BASE_DIR, 'scaled', 'global')
-PCA_SCALED_PATH = os.path.join(GLOBAL_SCALED_PATH, 'train_val_scaled_pca.csv')
+INPUT_PATH = os.path.join(GLOBAL_SCALED_PATH, 'train_val_scaled.csv')
 SCALER_OUTPUT_PATH = os.path.join(GLOBAL_SCALED_PATH, 'scalers.pkl')
 SCALER_META_PATH = os.path.join(GLOBAL_SCALED_PATH, 'scaler_meta.json')
 LSTM_FEATURE_COLUMNS_PATH = os.path.join(OUTPUT_BASE_DIR, 'lstm_feature_columns.json')
@@ -115,7 +115,7 @@ def generate_folds(data_df_cleaned, train_window_size, val_window_size, step_siz
 
 # MAIN
 if __name__ == "__main__":
-    pca_scaled_df = pd.read_csv(PCA_SCALED_PATH)
-    pca_scaled_df['Date'] = pd.to_datetime(pca_scaled_df['Date'])
+    lstm_scaled_df = pd.read_csv(INPUT_PATH)
+    lstm_scaled_df['Date'] = pd.to_datetime(lstm_scaled_df['Date'])
 
-    generate_folds(pca_scaled_df, TRAIN_WINDOW_SIZE, VAL_WINDOW_SIZE, STEP_SIZE)
+    generate_folds(lstm_scaled_df, TRAIN_WINDOW_SIZE, VAL_WINDOW_SIZE, STEP_SIZE)

@@ -11,7 +11,7 @@ BASE_DIR = "data"
 OUTPUT_BASE_DIR = os.path.join(BASE_DIR, "processed_folds")
 
 LSTM_FEATURE_COLUMNS_PATH = os.path.join(OUTPUT_BASE_DIR, "lstm_feature_columns.json")
-DEFAULT_FOLDS_SUMMARY = os.path.join(OUTPUT_BASE_DIR, "folds_summary_lstm_nvda_cleaned.json")
+DEFAULT_FOLDS_SUMMARY = os.path.join(OUTPUT_BASE_DIR, "folds_summary_lstm_cleaned_selection_pca.json")
 NON_FEATURE_COLS = ['Date', 'Ticker', 'target_log_returns', 'target', 'Log_Returns', 'Close_raw']
 
 FIG_DIR = "data/figures"
