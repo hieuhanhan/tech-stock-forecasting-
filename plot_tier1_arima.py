@@ -2,14 +2,15 @@ import json
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
+from pathlib import Path 
 
 TUNING_RESULTS = "data/tuning_results/jsons/tier1_arima.json"
 
 with open(TUNING_RESULTS, "r") as f:
     results = json.load(f)
 
-results = results[:9]
+save_dir = Path("data/tuning_results/figures/arima")
+save_dir.mkdir(parents=True, exist_ok=True)
 
 for r in results:
     fold_id = r["fold_id"]
@@ -24,9 +25,8 @@ for r in results:
     plt.ylabel("q")
     plt.tight_layout()
 
-    save_path = f"heatmaps/fold_{fold_id}_heatmap.png"
-    os.makedirs("heatmaps", exist_ok=True)
+    save_path = save_dir / f"fold_{fold_id}_heatmap.png"
     plt.savefig(save_path)
     plt.close()
 
-print("[DONE] Heatmaps saved in 'heatmaps/' directory.")
+print(f"[DONE] Heatmaps saved in '{save_dir}' directory.")

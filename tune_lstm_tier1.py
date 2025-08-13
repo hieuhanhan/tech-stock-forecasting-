@@ -2,11 +2,11 @@ import os
 import json
 import argparse
 import logging
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tqdm import tqdm
+import Path
 
 from pymoo.optimize import minimize as pymoo_minimize
 from pymoo.algorithms.soo.nonconvex.ga import GA
@@ -23,41 +23,92 @@ from lstm_utils import (
     TOP_N_SEEDS
 )
 
+# ---------- Helpers ----------
+def ensure_dir(p: Path):
+    p.mkdir(parents=True, exist_ok=True)
+
+def load_json(path: Path):
+    with path.open("r") as f:
+        return json.load(f)
+
+def load_lstm_features(path):
+    with open(path) as f:
+        feats = json.load(f)
+    assert isinstance(feats, list) and all(isinstance(c, str) for c in feats)
+    return feats
+
+def prepare_X(df, features, strict=True, fill_value=0.0):
+    missing = [c for c in features if c not in df.columns]
+    extra   = [c for c in df.columns if c not in features]
+    if missing and strict:
+        raise KeyError(f"Missing LSTM features: {missing}")
+    for c in missing:
+        df[c] = fill_value
+    X = df[features].to_numpy(dtype=np.float32, copy=False)
+    return X, missing, extra
+
+# ---------- Main ----------
+
 def main():
     parser = argparse.ArgumentParser("Tier 1 LSTM Tuning")
-    parser.add_argument('--data-dir', default='data/scaled_folds')
+    parser.add_argument('--meta-path', default='data/processed_folds/final/lstm/selected_lstm_final_paths.json',
+                        help='JSON with train/val CSV paths per fold')
+    parser.add_argument('--folds-path', default='data/processed_folds/final/lstm/lstm_tuning_folds.json',
+                        help='JSON with list of fold_ids to tune')
+    parser.add_argument('--feature-path', default='data/processed_folds/lstm_feature_columns.json',
+                        help='JSON with list of features to tune')
+    parser.add_argument('--output-json', default='data/tuning_results/jsons/tier1_lstm.json')
+    parser.add_argument('--output-csv',  default='data/tuning_results/csv/tier1_lstm.csv')
     parser.add_argument('--max-folds', type=int, default=None)
-    parser.add_argument('--tier1-json', default='data/tuning_results/jsons/tier1_lstm.json')
-    parser.add_argument('--tier1-csv', default='data/tuning_results/csv/tier1_lstm.csv')
+    parser.add_argument('--strict-paths', action='store_true')
     args = parser.parse_args()
 
-    os.makedirs(LOG_DIR, exist_ok=True)
-    log_path = os.path.join(LOG_DIR, "tier1_lstm.log")
+    # Logging
+    ensure_dir(Path(LOG_DIR))
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(message)s',
-        handlers=[logging.FileHandler(log_path), logging.StreamHandler()]
+        handlers=[
+            logging.FileHandler(Path(LOG_DIR) / "tier1_lstm.log"),
+            logging.StreamHandler()
+        ]
     )
-    np.random.seed(42); tf.random.set_seed(42)
+    np.random.seed(42)
 
-    # load fold metadata
-    folds_summary = os.path.join(args.data_dir, 'folds_summary_rescaled.json')
-    rep_path = os.path.join(args.data_dir, 'lstm', 'lstm_tuning_folds.json')
-    summary = {f['fold_id']: f for f in json.load(open(folds_summary))['lstm']}
-    reps = [r['fold_id'] for r in json.load(open(rep_path))]
+    ensure_dir(Path(args.output_json).parent)
+    ensure_dir(Path(args.output_csv).parent)
 
-    os.makedirs(os.path.dirname(args.tier1_json), exist_ok=True)
-    os.makedirs(os.path.dirname(args.tier1_csv), exist_ok=True)
+    # Load metadata & folds
+    summary_raw = load_json(Path(args.meta_path))
+    if isinstance(summary_raw, dict) and "lstm" in summary_raw:
+        summary_list = summary_raw["lstm"]
+    elif isinstance(summary_raw, list):
+        summary_list = summary_raw
+    else:
+        raise ValueError(f"Unexpected format in {args.meta_path}")
+    summary = {f["global_fold_id"]: f for f in summary_list}
 
+    reps_ids = load_json(Path(args.folds_path))  
+    if args.max_folds:
+        reps_ids = reps_ids[:args.max_folds]
+
+    # Resume if exists
     try:
-        results = json.load(open(args.tier1_json))
+        results = load_json(Path(args.output_json))
+        if isinstance(results, dict):
+            results = results.get("results", [])
         done = {r['fold_id'] for r in results}
     except FileNotFoundError:
         results, done = [], set()
 
-    pending = [fid for fid in reps if fid not in done]
-    if args.max_folds: 
-        pending = pending[:args.max_folds]
+    pending = [fid for fid in reps_ids if fid not in done]
+
+    # Tune each fold
+    root_dir = Path(args.meta_path).parents[2]
+    logging.info("[PATH] CWD=%s", Path.cwd().resolve())
+    logging.info("[PATH] meta_path=%s", Path(args.meta_path).resolve())
+    logging.info("[PATH] root_dir=%s", root_dir.resolve())
+
 
     for fid in tqdm(pending, desc="Tier1 LSTM"):
         logging.info(f"Running fold {fid} for ticker {summary[fid]['ticker']}")

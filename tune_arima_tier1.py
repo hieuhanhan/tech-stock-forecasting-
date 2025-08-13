@@ -1,10 +1,12 @@
-import os
+# tier1_arima.py
 import json
-import argparse
 import logging
+from pathlib import Path
+import argparse
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import sys
 from skopt import gp_minimize
 from skopt.space import Integer
 from pymoo.algorithms.soo.nonconvex.ga import GA
@@ -17,76 +19,149 @@ from arima_utils import (
     GA_POP_SIZE,
     GA_N_GEN,
     BO_N_CALLS,
-    TOP_N_SEEDS
+    TOP_N_SEEDS,
 )
 
+# ---------- Helpers ----------
+def ensure_dir(p: Path):
+    p.mkdir(parents=True, exist_ok=True)
+
+def load_json(path: Path):
+    with path.open("r") as f:
+        return json.load(f)
+
+def pick_arima_feature(df: pd.DataFrame) -> str:
+    """Always use Log_Returns for ARIMA."""
+    if "Log_Returns" not in df.columns:
+        raise ValueError("Log_Returns not found")
+    return "Log_Returns"
+
+# ---------- Main ----------
 def main():
-    parser = argparse.ArgumentParser("Tier 1 ARIMA Tuning")
-    parser.add_argument('--data-dir', default='data/scaled_folds')
+    parser = argparse.ArgumentParser("Tier 1 ARIMA Tuning (Log_Returns only)")
+    parser.add_argument('--meta-path', default='data/processed_folds/final/arima/selected_arima_final_paths.json',
+                        help='JSON with train/val CSV paths per fold')
+    parser.add_argument('--folds-path', default='data/processed_folds/final/arima/arima_tuning_folds.json',
+                        help='JSON with list of fold_ids to tune')
+    parser.add_argument('--output-json', default='data/tuning_results/jsons/tier1_arima.json')
+    parser.add_argument('--output-csv',  default='data/tuning_results/csv/tier1_arima.csv')
     parser.add_argument('--max-folds', type=int, default=None)
-    parser.add_argument('--tier1-json', default='data/tuning_results/jsons/tier1_arima.json')
-    parser.add_argument('--tier1-csv',  default='data/tuning_results/csv/tier1_arima.csv')
+    parser.add_argument('--strict-paths', action='store_true')
     args = parser.parse_args()
 
-    os.makedirs(LOG_DIR, exist_ok=True)
-    log_path = os.path.join(LOG_DIR, "tier1_arima.log")
+    # Logging setup
+    ensure_dir(Path(LOG_DIR))
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(message)s',
-        handlers=[logging.FileHandler(log_path), logging.StreamHandler()]
+        handlers=[
+            logging.FileHandler(Path(LOG_DIR) / "tier1_arima.log"),
+            logging.StreamHandler()
+        ]
     )
     np.random.seed(42)
 
-    folds_summary = os.path.join(args.data_dir, 'folds_summary_rescaled.json')
-    reps_path = os.path.join(args.data_dir, 'arima', 'arima_tuning_folds.json')
-    summary = {f['fold_id']: f for f in json.load(open(folds_summary))['arima']}
-    reps = [r['fold_id'] for r in json.load(open(reps_path))]
+    ensure_dir(Path(args.output_json).parent)
+    ensure_dir(Path(args.output_csv).parent)
 
-    os.makedirs(os.path.dirname(args.tier1_json), exist_ok=True)
-    os.makedirs(os.path.dirname(args.tier1_csv), exist_ok=True)
+    # Load metadata & folds
+    summary_raw = load_json(Path(args.meta_path))
+    if isinstance(summary_raw, dict) and "arima" in summary_raw:
+        summary_list = summary_raw["arima"]
+    elif isinstance(summary_raw, list):
+        summary_list = summary_raw
+    else:
+        raise ValueError(f"Unexpected format in {args.meta_path}")
+    summary = {f["global_fold_id"]: f for f in summary_list}
 
+    reps_ids = load_json(Path(args.folds_path))  
+    if args.max_folds:
+        reps_ids = reps_ids[:args.max_folds]
+
+    # Resume if exists
     try:
-        results = json.load(open(args.tier1_json))
+        results = load_json(Path(args.output_json))
+        if isinstance(results, dict):
+            results = results.get("results", [])
         done = {r['fold_id'] for r in results}
     except FileNotFoundError:
         results, done = [], set()
 
-    pending = [fid for fid in reps if fid not in done]
-    if args.max_folds:
-        pending = pending[:args.max_folds]
+    pending = [fid for fid in reps_ids if fid not in done]
 
-    for fid in tqdm(pending, desc='Tier1 ARIMA'):
-        info = summary[fid]
-        train = pd.read_csv(os.path.join(args.data_dir, info['train_path']))
-        val = pd.read_csv(os.path.join(args.data_dir, info['val_path']))
-        train_ret = train['Log_Returns'].dropna().values
-        val_ret = val['Log_Returns'].values
+    root_dir = Path(args.meta_path).parents[2]
+    logging.info("[PATH] CWD=%s", Path.cwd().resolve())
+    logging.info("[PATH] meta_path=%s", Path(args.meta_path).resolve())
+    logging.info("[PATH] root_dir=%s", root_dir.resolve())
 
+    # Tune each fold
+    for fid in tqdm(pending, desc='Tier1 ARIMA', leave=True, position=0, file=sys.stdout):
+        info = summary.get(fid)
+        if not info:
+            logging.warning(f"[WARN] Missing metadata for fid={fid}")
+            continue
+
+        train_rel = info.get("final_train_path") or info.get("train_path_arima")
+        val_rel   = info.get("final_val_path")   or info.get("val_path_arima")
+
+        if not train_rel or not val_rel:
+            msg = f"Missing train/val paths in metadata for fid={fid} (keys: final_* or *_arima)"
+            if args.strict_paths:
+                raise FileNotFoundError(msg)
+            logging.warning("[WARN] " + msg)
+            continue
+
+        train_csv = (root_dir / train_rel).resolve()
+        val_csv   = (root_dir / val_rel).resolve()
+
+        if not (train_csv.exists() and val_csv.exists()):
+            logging.warning(f"[WARN] Missing CSV for fid={fid}")
+            continue
+
+        train = pd.read_csv(train_csv)
+        val   = pd.read_csv(val_csv)
+
+        try:
+            feat = pick_arima_feature(train)
+        except ValueError as e:
+            if args.strict_paths: raise
+            logging.warning(f"[WARN] {e} -> skip fid={fid}")
+            continue
+
+        train_ret = train[feat].dropna().to_numpy(float)
+        val_ret   = val[feat].to_numpy(float)
+        if train_ret.size == 0 or val_ret.size == 0:
+            logging.warning(f"[WARN] Empty series for fid={fid}")
+            continue
+
+        # GA Search
         algorithm = GA(pop_size=GA_POP_SIZE, eliminate_duplicates=True, save_history=True)
         res_ga = pymoo_minimize(
             Tier1ARIMAProblem(train_ret, val_ret),
             algorithm,
             ('n_gen', GA_N_GEN),
             verbose=False,
-            return_algorithm=True
+            return_algorithm=True,
+            seed=42
         )
 
-        all_individuals = []
-        for entry in res_ga.algorithm.history:
-            all_individuals.extend(entry.pop)
-
+        all_inds = [ind for gen in res_ga.algorithm.history for ind in getattr(gen, 'pop', [])]
         seen, unique_seeds = set(), []
-        for ind in all_individuals:
+        for ind in all_inds:
             key = (int(ind.X[0]), int(ind.X[1]))
             if key not in seen:
                 seen.add(key)
                 unique_seeds.append(ind)
-
         unique_seeds.sort(key=lambda ind: ind.F[0])
-        top_seeds = unique_seeds[:TOP_N_SEEDS]
-        x0 = [[int(ind.X[0]), int(ind.X[1])] for ind in top_seeds]
-        y0 = [float(ind.F[0]) for ind in top_seeds]
 
+        if unique_seeds:
+            x0 = [[int(ind.X[0]), int(ind.X[1])] for ind in unique_seeds[:TOP_N_SEEDS]]
+            y0 = [float(ind.F[0]) for ind in unique_seeds[:TOP_N_SEEDS]]
+        else:
+            x0 = [[1, 1]]
+            y0 = [arima_rmse([1, 1], train_ret, val_ret)]
+
+        # BO Refinement
         res_bo = gp_minimize(
             lambda x: arima_rmse(x, train_ret, val_ret),
             dimensions=[Integer(1, 7), Integer(1, 7)],
@@ -99,16 +174,18 @@ def main():
             'fold_id': fid,
             'best_params': {'p': int(res_bo.x[0]), 'd': 0, 'q': int(res_bo.x[1])},
             'rmse': float(res_bo.fun),
+            'feature': feat,
             'top_ga': [
                 {'p': int(ind.X[0]), 'q': int(ind.X[1]), 'rmse': float(ind.F[0])}
                 for ind in unique_seeds
             ]
         })
-        json.dump(results, open(args.tier1_json, 'w'), indent=2)
 
-    pd.DataFrame(results).to_csv(args.tier1_csv, index=False)
+        with Path(args.output_json).open('w') as f:
+            json.dump(results, f, indent=2)
+
+    pd.DataFrame(results).to_csv(Path(args.output_csv), index=False)
     logging.info('=== Tier 1 ARIMA complete ===')
-
 
 if __name__ == '__main__':
     main()

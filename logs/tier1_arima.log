@@ -1,0 +1,11 @@
+2025-08-13 15:42:10,770 [INFO] [PATH] CWD=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting
+2025-08-13 15:42:10,771 [INFO] [PATH] meta_path=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/data/processed_folds/final/arima/selected_arima_final_paths.json
+2025-08-13 15:42:10,771 [INFO] [PATH] root_dir=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/data/processed_folds
+2025-08-13 16:07:45,134 [INFO] [PATH] CWD=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting
+2025-08-13 16:07:45,134 [INFO] [PATH] meta_path=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/data/processed_folds/final/arima/selected_arima_final_paths.json
+2025-08-13 16:07:45,134 [INFO] [PATH] root_dir=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/data/processed_folds
+2025-08-13 16:32:39,150 [INFO] === Tier 1 ARIMA complete ===
+2025-08-13 17:09:55,460 [INFO] [PATH] CWD=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting
+2025-08-13 17:09:55,460 [INFO] [PATH] meta_path=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/data/processed_folds/final/arima/selected_arima_final_paths.json
+2025-08-13 17:09:55,460 [INFO] [PATH] root_dir=/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/data/processed_folds
+2025-08-13 17:47:28,319 [INFO] === Tier 1 ARIMA complete ===
