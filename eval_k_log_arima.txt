@@ -1,0 +1,5 @@
+[INFO] EVALUATE k in [5, 20] step 5 | hard_overlap=False max_overlap=0.7 per_ticker_max=2
+k=  5 | cov_mean=0.560 min=0.002 p05=0.205 p95=0.858 | diversity_mean=0.958 | selected=5
+k= 10 | cov_mean=0.664 min=0.186 p05=0.396 p95=0.907 | diversity_mean=0.901 | selected=10
+k= 15 | cov_mean=0.699 min=0.277 p05=0.431 p95=0.918 | diversity_mean=0.870 | selected=14
+k= 20 | cov_mean=0.699 min=0.277 p05=0.431 p95=0.918 | diversity_mean=0.870 | selected=14

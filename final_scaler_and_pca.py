@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from joblib import dump
+from joblib import dump, load
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 
@@ -40,6 +40,7 @@ def absolute_path_from_rel(rel_path: str) -> str:
     return os.path.join(OUTPUT_BASE_DIR, rel_path)
 
 def read_df(rel_path: Optional[str]) -> Optional[pd.DataFrame]:
+    """Đọc CSV theo đường dẫn tương đối dưới processed_folds."""
     if not rel_path:
         return None
     abspath = absolute_path_from_rel(rel_path)
@@ -48,7 +49,7 @@ def read_df(rel_path: Optional[str]) -> Optional[pd.DataFrame]:
     return pd.read_csv(abspath)
 
 def resolve_selected_list(selected_payload) -> List[Dict]:
-    """Accept either a list-of-folds or a report dict with 'selected_folds'."""
+    """Chấp nhận list-of-folds hoặc dict có key 'selected_folds'."""
     if isinstance(selected_payload, list):
         return selected_payload
     if isinstance(selected_payload, dict) and "selected_folds" in selected_payload:
@@ -66,7 +67,7 @@ def build_gid_map(folds_summary_rows: List[Dict]) -> Dict[int, Dict]:
 def enrich_selected_with_paths(selected_list: List[Dict],
                                folds_summary_rows: List[Dict],
                                model_type: str) -> List[Dict]:
-    """Return full records for selected folds by joining on global_fold_id."""
+    """Join theo global_fold_id để gắn đủ path train/val/test từ folds_summary."""
     gid_map = build_gid_map(folds_summary_rows)
     key_train = "train_path_lstm" if model_type == "lstm" else "train_path_arima"
     key_val   = "val_path_lstm"   if model_type == "lstm" else "val_path_arima"
@@ -82,12 +83,10 @@ def enrich_selected_with_paths(selected_list: List[Dict],
         if not src:
             missing += 1
             continue
-        # giữ lại thông tin meta đã chọn + gắn đủ đường dẫn
         merged = dict(src)
         merged.setdefault("ticker", item.get("ticker"))
         merged.setdefault("date_min", item.get("date_min"))
         merged.setdefault("date_max", item.get("date_max"))
-        # đảm bảo các path tồn tại trong bản ghi
         if not (merged.get(key_train) and merged.get(key_val)):
             missing += 1
             continue
@@ -95,13 +94,14 @@ def enrich_selected_with_paths(selected_list: List[Dict],
     if missing:
         print(f"[WARN] {missing} selected items could not be matched/enriched from folds_summary.")
     if not out:
-        raise RuntimeError("[ERROR] No selected folds could be enriched with paths. Check --folds_summary_path.")
+        raise RuntimeError("[ERROR] No selected folds could be enriched with paths. Check --folds-summary-path.")
     return out
 
 def infer_feature_columns_from_first_fold(selected_folds: List[Dict], model_type: str) -> List[str]:
-    """Infer feature columns from the first available TRAIN CSV.
-       - ARIMA: prefer univariate ['Log_Returns'] -> ['Close_raw'] -> fallback numeric.
-       - LSTM : keep numeric columns excluding NON_FEATURE_KEEP + 'target*'."""
+    """Suy luận cột feature từ TRAIN đầu tiên.
+       - ARIMA: ưu tiên ['Log_Returns'] -> ['Close_raw'] -> 1 cột numeric fallback.
+       - LSTM : lấy tất cả numeric trừ NON_FEATURE_KEEP & target*.
+    """
     key_train = "train_path_lstm" if model_type == "lstm" else "train_path_arima"
 
     for fd in selected_folds:
@@ -110,21 +110,17 @@ def infer_feature_columns_from_first_fold(selected_folds: List[Dict], model_type
         if df is None:
             continue
         if model_type.lower() == "arima":
-            # prefer Log_Returns
             if "Log_Returns" in df.columns and pd.api.types.is_numeric_dtype(df["Log_Returns"]):
                 return ["Log_Returns"]
-            # fallback Close_raw
             if "Close_raw" in df.columns and pd.api.types.is_numeric_dtype(df["Close_raw"]):
                 return ["Close_raw"]
-            # final fallback: numeric cols except obvious non-features/targets
             cols = [c for c in df.columns
                     if c not in ["Date", "Ticker"] and not str(c).lower().startswith("target")]
             numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
             if numeric_cols:
-                # still keep it univariate: pick the first stable-looking column
                 return [numeric_cols[0]]
             continue
-        # LSTM path (multi-feature): exclude non-features and target*
+        # LSTM
         cols = [c for c in df.columns if c not in NON_FEATURE_KEEP and not str(c).lower().startswith("target")]
         cols = [c for c in cols if c not in ["Date", "Ticker", "Log_Returns", "Close_raw"]]
         numeric_cols = [c for c in cols if pd.api.types.is_numeric_dtype(df[c])]
@@ -168,6 +164,7 @@ class ScalerSpec:
     minmax_cols: Optional[List[str]]  # only used when mode == "hybrid"
 
 class HybridScaler:
+    """Chuẩn hóa lai: một số cột MinMax, phần còn lại Standard."""
     def __init__(self, minmax_cols: List[str], all_feature_cols: List[str]):
         self.minmax_cols = list(minmax_cols)
         self.std_cols = [c for c in all_feature_cols if c not in self.minmax_cols]
@@ -199,7 +196,7 @@ def build_scaler(spec: ScalerSpec, feature_cols: List[str]):
         return MinMaxScaler(), {"type": "minmax"}
     if spec.mode == "hybrid":
         if not spec.minmax_cols:
-            raise ValueError("--minmax_cols must be provided for hybrid mode.")
+            raise ValueError("--minmax-cols must be provided for hybrid mode.")
         not_in = [c for c in spec.minmax_cols if c not in feature_cols]
         if not_in:
             raise ValueError(f"[ERROR] minmax_cols not in feature columns: {not_in}")
@@ -211,7 +208,7 @@ def fit_pca_safely(X: np.ndarray, n_components_arg, max_pc: Optional[int] = None
     n_samples, n_features = X.shape
     if isinstance(n_components_arg, float):
         if not (0.0 < n_components_arg < 1.0):
-            raise ValueError("When float, --pca_n_components must be in (0,1).")
+            raise ValueError("When float, --pca-n-components must be in (0,1).")
         pca = PCA(n_components=n_components_arg, svd_solver="full", random_state=random_state)
         pca.fit(X)
         k = int(pca.n_components_)
@@ -260,13 +257,14 @@ def transform_and_save_fold(fd: Dict,
         df = read_df(rel)
         if df is None or any(c not in df.columns for c in feature_cols):
             continue
-        X = df[feature_cols].to_numpy(dtype=np.float32, copy=False)
 
+        # scale
         if isinstance(scaler, (StandardScaler, MinMaxScaler)):
-            Xs = scaler.transform(X)
+            Xs = scaler.transform(df[feature_cols].to_numpy(dtype=np.float32, copy=False))
         else:
             Xs = scaler.transform(df[feature_cols]).to_numpy(dtype=np.float32)
 
+        # pca
         if pca is None:
             Xout = Xs
             out_cols = feature_cols
@@ -275,6 +273,8 @@ def transform_and_save_fold(fd: Dict,
             out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
 
         keep = [c for c in keep_cols if c in df.columns]
+        if model_type.lower() == "arima" and feature_cols == ["Log_Returns"]:
+            keep = [c for c in keep if c != "Log_Returns"]
         out_df = pd.concat(
             [df[keep].reset_index(drop=True),
             pd.DataFrame(Xout, columns=out_cols)],
@@ -290,47 +290,98 @@ def transform_and_save_fold(fd: Dict,
     if "test"  in outputs: updated["final_test_path"]  = os.path.relpath(outputs["test"],  OUTPUT_BASE_DIR)
     return updated
 
+def transform_and_save_test_csv(test_csv_path: str,
+                                model_type: str,
+                                feature_cols: List[str],
+                                keep_cols: List[str],
+                                scaler,
+                                pca: Optional[PCA],
+                                out_paths: Dict[str, str]) -> str:
+    """Transform file test duy nhất (không thuộc fold_summary)."""
+    if not os.path.exists(test_csv_path):
+        raise FileNotFoundError(f"[ERROR] --test-csv not found: {test_csv_path}")
+    df = pd.read_csv(test_csv_path)
+
+    missing = [c for c in feature_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"[ERROR] Test CSV missing required feature columns: {missing}")
+
+    # scale
+    if isinstance(scaler, (StandardScaler, MinMaxScaler)):
+        Xs = scaler.transform(df[feature_cols].to_numpy(dtype=np.float32, copy=False))
+    else:
+        # HybridScaler expects DataFrame
+        Xs = scaler.transform(df[feature_cols]).to_numpy(dtype=np.float32)
+
+    # pca (ARIMA thường pca=None vì univariate)
+    if pca is None:
+        Xout = Xs
+        out_cols = feature_cols
+    else:
+        Xout = pca.transform(Xs)
+        out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
+
+    keep = [c for c in keep_cols if c in df.columns]
+    if model_type.lower() == "arima" and feature_cols == ["Log_Returns"]:
+        keep = [c for c in keep if c != "Log_Returns"]
+    out_df = pd.concat(
+        [df[keep].reset_index(drop=True),
+        pd.DataFrame(Xout, columns=out_cols)],
+        axis=1)
+
+    # tên file chuẩn hóa theo model
+    out_name = f"{model_type.lower()}_test_scaled.csv"
+    out_file = os.path.join(out_paths["test"], out_name)
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    out_df.to_csv(out_file, index=False)
+    return out_file
+
 # -----------------------------
 # Main
 # -----------------------------
 def main():
     ap = argparse.ArgumentParser(description="Final fold-level scaling + PCA on representative folds (LSTM/ARIMA)")
-    ap.add_argument("--model_type", required=True, choices=["lstm", "arima"])
-    ap.add_argument("--selected_folds_json", required=True,
+    ap.add_argument("--model-type", required=True, choices=["lstm", "arima"])
+    ap.add_argument("--selected-folds-json", required=True,
                     help="Path to selected folds JSON (either list or report with 'selected_folds').")
-    ap.add_argument("--folds_summary_path", default="", help="Optional path to folds summary JSON")
-    ap.add_argument("--feature_columns_path", default="", help="Optional feature columns JSON; if missing will be inferred after enrichment.")
-    ap.add_argument("--scaler_mode", default="standard", choices=["standard", "minmax", "hybrid"])
-    ap.add_argument("--minmax_cols", default="", help="Comma-separated cols for MinMax (hybrid mode)")
-    ap.add_argument("--pca_n_components", default="0.95", help="float (0,1) variance target or int")
-    ap.add_argument("--pca_max_pc", type=int, default=64)
-    ap.add_argument("--skip_pca_for_arima", action="store_true", default=True, help="If ARIMA and num_features<=1, skip PCA (scale only).")
-    ap.add_argument("--models_tag", default="")
-    ap.add_argument("--assume_inputs_clean", action="store_true")
+    ap.add_argument("--folds-summary-path", default="",
+                    help="Optional path to folds summary JSON; used to enrich selected folds if selected JSON lacks paths.")
+    ap.add_argument("--feature-columns-path", default="",
+                    help="Optional feature columns JSON; if missing will be inferred after enrichment.")
+    ap.add_argument("--scaler-mode", default="standard", choices=["standard", "minmax", "hybrid"])
+    ap.add_argument("--minmax-cols", default="", help="Comma-separated cols for MinMax (hybrid mode)")
+    ap.add_argument("--pca-n-components", default="0.95", help="float (0,1) variance target or int")
+    ap.add_argument("--pca-max-pc", type=int, default=64)
+    ap.add_argument("--skip-pca-for-arima", action="store_true", default=True,
+                    help="If ARIMA and num_features<=1, skip PCA (scale only).")
+    ap.add_argument("--models-tag", default="")
+    ap.add_argument("--assume-inputs-clean", action="store_true",
+                    help="(reserved) if inputs are already checked.")
+    ap.add_argument("--test-csv", default="",
+                    help="Optional path to a single test CSV (not in folds). If provided, it will be transformed to <final>/<model>/test/<model>_test_scaled.csv")
     args = ap.parse_args()
 
     # 1) Load selected payload and normalize to list
     selected_payload = load_json(args.selected_folds_json)
     selected_list = resolve_selected_list(selected_payload)
 
-    # 2) If items don't have train/val/test paths, enrich from folds_summary_path
-    needs_enrich = not any("train_path_lstm" in d or "train_path_arima" in d for d in selected_list)
+    # 2) Enrich with paths (if missing)
+    needs_enrich = not any(("train_path_lstm" in d or "train_path_arima" in d) for d in selected_list)
     if needs_enrich:
         if not args.folds_summary_path or not os.path.exists(args.folds_summary_path):
-            raise RuntimeError("[ERROR] selected JSON has no paths. Please provide --folds_summary_path to enrich.")
+            raise RuntimeError("[ERROR] selected JSON has no paths. Please provide --folds-summary-path to enrich.")
         folds_summary = load_json(args.folds_summary_path)
         selected_list = enrich_selected_with_paths(selected_list, folds_summary, args.model_type)
         print(f"[INFO] Enriched {len(selected_list)} selected folds with original paths.")
 
     # 3) Load or infer feature columns
     if args.feature_columns_path and os.path.exists(args.feature_columns_path):
-        with open(args.feature_columns_path, "r") as f:
-            feature_cols = json.load(f)
+        feature_cols = load_json(args.feature_columns_path)
         if not isinstance(feature_cols, list) or not feature_cols:
             raise ValueError("[ERROR] Invalid feature columns JSON.")
         print(f"[INFO] Loaded feature columns from {args.feature_columns_path}: {len(feature_cols)} cols")
     else:
-        print("[WARN] --feature_columns_path missing. Inferring from first TRAIN CSV...")
+        print("[WARN] --feature-columns-path missing. Inferring from first TRAIN CSV...")
         feature_cols = infer_feature_columns_from_first_fold(selected_list, args.model_type)
         inferred_path = os.path.join(FINAL_OUT_ROOT, f"{args.model_type}_feature_columns_inferred.json")
         save_json(feature_cols, inferred_path)
@@ -408,7 +459,17 @@ def main():
             fd, args.model_type, feature_cols, keep_cols, scaler_obj, pca, out_dirs
         ))
 
-    # 8) Save updated selected folds (final paths)
+    # 8) (NEW) Transform single test CSV if provided
+    if args.test_csv:
+        try:
+            out_test = transform_and_save_test_csv(
+                args.test_csv, args.model_type, feature_cols, keep_cols, scaler_obj, pca, out_dirs
+            )
+            print(f"[INFO] Saved scaled TEST -> {out_test}")
+        except Exception as e:
+            print(f"[WARN] Failed to transform --test-csv: {e}")
+
+    # 9) Save updated selected folds (final paths)
     base_name = os.path.splitext(os.path.basename(args.selected_folds_json))[0]
     out_json = os.path.join(FINAL_OUT_ROOT, args.model_type, f"{base_name}_final_paths.json")
     save_json(updated_folds, out_json)
