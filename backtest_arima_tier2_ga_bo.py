@@ -1,9 +1,3 @@
-"""
-Backtest GA-knee vs GA+BO-knee across intervals on a held-out test set.
-- Inputs: Tier-2 *_front.csv (GA and GA+BO fronts), test CSV with Log_Returns.
-- Output: CSV of test Sharpe, MDD, turnover for each interval & source.
-NO plotting here. Make separate viz scripts.
-"""
 import warnings
 import os
 import json
@@ -121,6 +115,10 @@ def backtest_continuous(
     total_turnover = 0.0
     prev_pos_last = 0.0
 
+    # keep full position & per-step turnover traces
+    pos_all = []
+    turnover_all = []
+
     for start in range(start_idx, n_total, retrain_interval):
         end = min(start + retrain_interval, n_total)
         block_log = test_log[start:end]
@@ -164,6 +162,9 @@ def backtest_continuous(
         cost_vec = cost_per_turnover * turnover
         total_turnover += float(turnover.sum())
 
+        pos_all.append(pos_now)
+        turnover_all.append(turnover)
+
         # PnL
         block_simple = np.exp(block_log) - 1.0
         ret_simple = block_simple * pos_now - cost_vec
@@ -185,6 +186,13 @@ def backtest_continuous(
     net_simple = np.concatenate(simple_all)
     net_log    = np.concatenate(log_all)
 
+    # build full series and counts
+    pos_series = np.concatenate(pos_all) if pos_all else np.array([])
+    turn_series = np.concatenate(turnover_all) if turnover_all else np.array([])
+    eps_tr = 1e-6  # tolerance to ignore numerical dust
+    n_rebalances = int(np.count_nonzero(turn_series > eps_tr))
+    approx_round_turns = float(np.sum(turn_series) / 2.0)  # optional metric
+
     sr = sharpe_ratio(net_simple)
     mdd = max_drawdown(net_log, input_type="log")
     ann_ret = float(np.mean(net_simple) * 252.0)
@@ -196,7 +204,8 @@ def backtest_continuous(
         ann_return=float(ann_ret),
         ann_vol=float(ann_vol),
         turnover=float(total_turnover),
-        n_trades=int(np.count_nonzero(np.diff(np.concatenate([[0.0], np.sign(net_simple)])))),
+        n_rebalances=n_rebalances,
+        approx_round_turns=approx_round_turns,
         n_points=int(net_simple.size)
     )
 

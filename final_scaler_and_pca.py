@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from joblib import dump, load
+from joblib import dump
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 
@@ -23,7 +23,7 @@ os.makedirs(FINAL_OUT_ROOT, exist_ok=True)
 os.makedirs(FINAL_MODELS_DIR, exist_ok=True)
 
 # -----------------------------
-# Helpers
+# Helpers / constants
 # -----------------------------
 NON_FEATURE_KEEP = ["Date", "Ticker", "target_log_returns", "target", "Log_Returns", "Close_raw"]
 
@@ -40,7 +40,6 @@ def absolute_path_from_rel(rel_path: str) -> str:
     return os.path.join(OUTPUT_BASE_DIR, rel_path)
 
 def read_df(rel_path: Optional[str]) -> Optional[pd.DataFrame]:
-    """Đọc CSV theo đường dẫn tương đối dưới processed_folds."""
     if not rel_path:
         return None
     abspath = absolute_path_from_rel(rel_path)
@@ -49,7 +48,6 @@ def read_df(rel_path: Optional[str]) -> Optional[pd.DataFrame]:
     return pd.read_csv(abspath)
 
 def resolve_selected_list(selected_payload) -> List[Dict]:
-    """Chấp nhận list-of-folds hoặc dict có key 'selected_folds'."""
     if isinstance(selected_payload, list):
         return selected_payload
     if isinstance(selected_payload, dict) and "selected_folds" in selected_payload:
@@ -67,7 +65,6 @@ def build_gid_map(folds_summary_rows: List[Dict]) -> Dict[int, Dict]:
 def enrich_selected_with_paths(selected_list: List[Dict],
                                folds_summary_rows: List[Dict],
                                model_type: str) -> List[Dict]:
-    """Join theo global_fold_id để gắn đủ path train/val/test từ folds_summary."""
     gid_map = build_gid_map(folds_summary_rows)
     key_train = "train_path_lstm" if model_type == "lstm" else "train_path_arima"
     key_val   = "val_path_lstm"   if model_type == "lstm" else "val_path_arima"
@@ -98,12 +95,7 @@ def enrich_selected_with_paths(selected_list: List[Dict],
     return out
 
 def infer_feature_columns_from_first_fold(selected_folds: List[Dict], model_type: str) -> List[str]:
-    """Suy luận cột feature từ TRAIN đầu tiên.
-       - ARIMA: ưu tiên ['Log_Returns'] -> ['Close_raw'] -> 1 cột numeric fallback.
-       - LSTM : lấy tất cả numeric trừ NON_FEATURE_KEEP & target*.
-    """
     key_train = "train_path_lstm" if model_type == "lstm" else "train_path_arima"
-
     for fd in selected_folds:
         rel = fd.get(key_train)
         df = read_df(rel)
@@ -158,13 +150,33 @@ def gather_union_train(selected_folds: List[Dict],
         raise ValueError("[ERROR] Non-finite values found in UNION TRAIN features.")
     return union_train
 
+def drop_duplicate_log_returns(out_df: pd.DataFrame) -> pd.DataFrame:
+    if "Log_Returns" in out_df.columns and "Log_Returns_raw" in out_df.columns:
+        a = out_df["Log_Returns"].to_numpy(dtype=float)
+        b = out_df["Log_Returns_raw"].to_numpy(dtype=float)
+        if np.allclose(a, b, atol=1e-12, rtol=1e-9):
+            out_df = out_df.drop(columns=["Log_Returns_raw"])
+    return out_df
+
+def make_unique_feature_names(base_names: List[str], existing: set) -> List[str]:
+    out = []
+    used = set(existing)
+    for n in base_names:
+        new = n if n not in used else f"{n}_scaled"
+        k = 2
+        while new in used:
+            new = f"{n}_scaled{k}"
+            k += 1
+        out.append(new)
+        used.add(new)
+    return out
+
 @dataclass
 class ScalerSpec:
     mode: str  # "standard" | "minmax" | "hybrid"
-    minmax_cols: Optional[List[str]]  # only used when mode == "hybrid"
+    minmax_cols: Optional[List[str]]
 
 class HybridScaler:
-    """Chuẩn hóa lai: một số cột MinMax, phần còn lại Standard."""
     def __init__(self, minmax_cols: List[str], all_feature_cols: List[str]):
         self.minmax_cols = list(minmax_cols)
         self.std_cols = [c for c in all_feature_cols if c not in self.minmax_cols]
@@ -239,12 +251,13 @@ def ensure_dirs(model_type: str):
         os.makedirs(p, exist_ok=True)
     return paths
 
+# -------------- PATCHED WRITERS --------------
 def transform_and_save_fold(fd: Dict,
                             model_type: str,
                             feature_cols: List[str],
                             keep_cols: List[str],
                             scaler,
-                            pca: PCA,
+                            pca: Optional[PCA],
                             out_paths: Dict[str, str]) -> Dict:
     key_train = "train_path_lstm" if model_type == "lstm" else "train_path_arima"
     key_val   = "val_path_lstm"   if model_type == "lstm" else "val_path_arima"
@@ -258,28 +271,30 @@ def transform_and_save_fold(fd: Dict,
         if df is None or any(c not in df.columns for c in feature_cols):
             continue
 
-        # scale
+        # Fit transforms on the given split (use fitted scaler/pca)
         if isinstance(scaler, (StandardScaler, MinMaxScaler)):
             Xs = scaler.transform(df[feature_cols].to_numpy(dtype=np.float32, copy=False))
         else:
             Xs = scaler.transform(df[feature_cols]).to_numpy(dtype=np.float32)
 
-        # pca
-        if pca is None:
-            Xout = Xs
-            out_cols = feature_cols
-        else:
-            Xout = pca.transform(Xs)
-            out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
+        out_df = df[ [c for c in keep_cols if c in df.columns] ].reset_index(drop=True).copy()
 
-        keep = [c for c in keep_cols if c in df.columns]
         if model_type.lower() == "arima" and feature_cols == ["Log_Returns"]:
-            keep = [c for c in keep if c != "Log_Returns"]
-        out_df = pd.concat(
-            [df[keep].reset_index(drop=True),
-            pd.DataFrame(Xout, columns=out_cols)],
-            axis=1
-        )
+            out_df["Log_Returns_scaled"] = Xs.ravel().astype(np.float32)
+        else:
+            if pca is None:
+                Xout = Xs
+                out_cols = feature_cols
+            else:
+                Xout = pca.transform(Xs)
+                out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
+            out_cols = make_unique_feature_names(out_cols, set(out_df.columns))
+
+            feat_df = pd.DataFrame(Xout, columns=out_cols)
+            out_df = pd.concat([out_df, feat_df], axis=1)
+
+        out_df = drop_duplicate_log_returns(out_df)
+        
         out_file = os.path.join(out_paths[split], os.path.basename(absolute_path_from_rel(rel)))
         out_df.to_csv(out_file, index=False)
         outputs[split] = out_file
@@ -297,7 +312,6 @@ def transform_and_save_test_csv(test_csv_path: str,
                                 scaler,
                                 pca: Optional[PCA],
                                 out_paths: Dict[str, str]) -> str:
-    """Transform file test duy nhất (không thuộc fold_summary)."""
     if not os.path.exists(test_csv_path):
         raise FileNotFoundError(f"[ERROR] --test-csv not found: {test_csv_path}")
     df = pd.read_csv(test_csv_path)
@@ -306,30 +320,27 @@ def transform_and_save_test_csv(test_csv_path: str,
     if missing:
         raise ValueError(f"[ERROR] Test CSV missing required feature columns: {missing}")
 
-    # scale
     if isinstance(scaler, (StandardScaler, MinMaxScaler)):
         Xs = scaler.transform(df[feature_cols].to_numpy(dtype=np.float32, copy=False))
     else:
-        # HybridScaler expects DataFrame
         Xs = scaler.transform(df[feature_cols]).to_numpy(dtype=np.float32)
 
-    # pca (ARIMA thường pca=None vì univariate)
-    if pca is None:
-        Xout = Xs
-        out_cols = feature_cols
-    else:
-        Xout = pca.transform(Xs)
-        out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
+    out_df = df[ [c for c in keep_cols if c in df.columns] ].reset_index(drop=True).copy()
 
-    keep = [c for c in keep_cols if c in df.columns]
     if model_type.lower() == "arima" and feature_cols == ["Log_Returns"]:
-        keep = [c for c in keep if c != "Log_Returns"]
-    out_df = pd.concat(
-        [df[keep].reset_index(drop=True),
-        pd.DataFrame(Xout, columns=out_cols)],
-        axis=1)
+        out_df["Log_Returns_scaled"] = Xs.ravel().astype(np.float32)
+    else:
+        if pca is None:
+            Xout = Xs
+            out_cols = feature_cols
+        else:
+            Xout = pca.transform(Xs)
+            out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
+        out_cols = make_unique_feature_names(out_cols, set(out_df.columns))
+        out_df = pd.concat([out_df, pd.DataFrame(Xout, columns=out_cols)], axis=1)
 
-    # tên file chuẩn hóa theo model
+    out_df = drop_duplicate_log_returns(out_df)
+
     out_name = f"{model_type.lower()}_test_scaled.csv"
     out_file = os.path.join(out_paths["test"], out_name)
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
@@ -459,7 +470,7 @@ def main():
             fd, args.model_type, feature_cols, keep_cols, scaler_obj, pca, out_dirs
         ))
 
-    # 8) (NEW) Transform single test CSV if provided
+    # 8) Transform single test CSV if provided
     if args.test_csv:
         try:
             out_test = transform_and_save_test_csv(

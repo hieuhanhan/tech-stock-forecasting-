@@ -3,6 +3,7 @@ import gc
 import json
 import logging
 import warnings
+import random
 from typing import List, Dict, Tuple, Optional, Callable
 from numpy.lib.stride_tricks import sliding_window_view
 
@@ -13,15 +14,31 @@ from scipy.stats import norm
 
 import tensorflow as tf
 from tensorflow.keras import Sequential, backend as K
-from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, BatchNormalization
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, BatchNormalization, LayerNormalization
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import mixed_precision
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, ConstantKernel as C, WhiteKernel
 
 from pymoo.core.problem import ElementwiseProblem
 from pymoo.core.sampling import Sampling
+
+set_global_seeds_called = False
+
+# ==================== Reproducibility & TF setup ====================
+def set_global_seeds(seed: int = 42):
+    np.random.seed(seed)
+    random.seed(seed)
+    try:
+        import tensorflow as tf
+        tf.random.set_seed(seed)
+    except Exception:
+        pass
+
+# Call once at module start for determinism
+set_global_seeds(42)
 
 # ==================== CONFIG ====================
 BASE_COST = 0.0005
@@ -51,6 +68,14 @@ def suppress_warnings():
         gpus = tf.config.list_physical_devices('GPU')
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
+        try:
+            tf.config.optimizer.set_jit(True)  # XLA
+        except Exception:
+            pass
+        try:
+            mixed_precision.set_global_policy('mixed_float16')
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -109,15 +134,23 @@ def create_windows(X: np.ndarray, y: np.ndarray, lookback: int):
     return wins.astype(np.float32), tars.astype(np.float32)
 
 # ==================== LSTM model ====================
-def build_lstm(window: int, units: int, lr: float, num_features: int, layers: int, dropout_rate: float = 0.2) -> Sequential:
+def build_lstm(window: int, units: int, lr: float, num_features: int, layers: int, dropout_rate: float = 0.2, norm_type: str = "auto") -> Sequential:
+    # choose normalization
+    def _norm_layer():
+        if norm_type == "layer":
+            return LayerNormalization()
+        if norm_type == "batch":
+            return BatchNormalization()
+        # auto: prefer LayerNorm for small batches to avoid BN instability
+        return LayerNormalization()
     model = Sequential()
     model.add(Input((int(window), int(num_features))))
     model.add(LSTM(int(units), return_sequences=(layers > 1)))
-    model.add(BatchNormalization())
+    model.add(_norm_layer())
     model.add(Dropout(float(dropout_rate)))
     if layers > 1:
         model.add(LSTM(max(8, int(units // 2))))
-        model.add(BatchNormalization())
+        model.add(_norm_layer())
         model.add(Dropout(float(dropout_rate)))
     model.add(Dense(1))
     model.compile(optimizer=Adam(learning_rate=float(lr)), loss="mse")
@@ -166,7 +199,8 @@ def lstm_rmse(params: List[float],
 
     try:
         K.clear_session()
-        model = build_lstm(w, units, lr, X_tr.shape[1], layers, dropout_rate=0.2)
+        norm_type = "layer" if batch_size <= 32 else "batch"
+        model = build_lstm(w, units, lr, X_tr.shape[1], layers, dropout_rate=0.2, norm_type=norm_type)
         es = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True, verbose=0)
         model.fit(Xw, yw, validation_data=(Xw_val, yw_val),
                   epochs=t1_epochs, batch_size=batch_size, callbacks=[es], verbose=0)
@@ -274,7 +308,7 @@ def create_periodic_lstm_objective(
 ):
     """
     Multi-objective (minimize): f0 = -Sharpe(simple PnL), f1 = MDD(log PnL).
-    Signals are 0/1 via dynamic threshold on predictions per block.
+    Signals are 0/1 via percentile threshold, MAD-based amplitude filter, and hysteresis.
     Costs charged on turnover (|sig_t - sig_{t-1}|).
     Exposes objective.stats_map[(w,u,round(lr,6),ep,round(thr,6))] = {turnover, raw_sharpe, raw_mdd, penalty}.
     """
@@ -296,6 +330,17 @@ def create_periodic_lstm_objective(
     batch_sz  = int(champ.get("batch_size", 32))
     dropout   = float(champ.get("dropout", 0.2))
     patience  = int(champ.get("patience", 5))
+
+    # Thresholding & robustness settings
+    HYSTERESIS = 0.05   # exit threshold is (q - HYSTERESIS), in percentile units
+    MAD_K = 0.5         # minimum deviation from median in MAD units to be considered actionable
+
+    # caches
+    win_cache_tr: Dict[Tuple[int,int], Tuple[np.ndarray, np.ndarray]] = {}
+    win_cache_val: Dict[Tuple[int,int,int,int], Tuple[np.ndarray, np.ndarray]] = {}
+
+    # ensure determinism
+    set_global_seeds(42)
 
     # penalties
     W_NO_TRADE = 20.0
@@ -339,7 +384,13 @@ def create_periodic_lstm_objective(
                 continue
 
             # Train windows
-            Xw, yw = create_windows(hist_X, hist_y, w)
+            cache_key_tr = (hist_X.shape[0], w)
+            if cache_key_tr in win_cache_tr:
+                Xw, yw = win_cache_tr[cache_key_tr]
+            else:
+                Xw, yw = create_windows(hist_X, hist_y, w)
+                if Xw is not None:
+                    win_cache_tr[cache_key_tr] = (Xw, yw)
             if Xw is None:
                 penalty += W_COLLAPSE
                 hist_X = np.vstack([hist_X, X_val[start:end]])
@@ -347,11 +398,17 @@ def create_periodic_lstm_objective(
                 continue
 
             # Val windows (warm-start with history)
-            Xw_val, yw_val = create_windows(
-                np.concatenate([hist_X[-w:], X_val[start:end]], axis=0),
-                np.concatenate([hist_y[-w:], y_val_for_train[start:end]], axis=0),
-                w
-            )
+            cache_key_val = (hist_X.shape[0], start, end, w)
+            if cache_key_val in win_cache_val:
+                Xw_val, yw_val = win_cache_val[cache_key_val]
+            else:
+                Xw_val, yw_val = create_windows(
+                    np.concatenate([hist_X[-w:], X_val[start:end]], axis=0),
+                    np.concatenate([hist_y[-w:], y_val_for_train[start:end]], axis=0),
+                    w
+                )
+                if Xw_val is not None:
+                    win_cache_val[cache_key_val] = (Xw_val, yw_val)
             if Xw_val is None:
                 penalty += W_COLLAPSE
                 hist_X = np.vstack([hist_X, X_val[start:end]])
@@ -360,38 +417,44 @@ def create_periodic_lstm_objective(
 
             try:
                 K.clear_session()
-                model = build_lstm(w, u, lr, hist_X.shape[1], layers, dropout_rate=dropout)
+                norm_type = "layer" if batch_sz <= 32 else "batch"
+                model = build_lstm(w, u, lr, hist_X.shape[1], layers, dropout_rate=dropout, norm_type=norm_type)
                 es = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True, verbose=0)
                 model.fit(Xw, yw, validation_data=(Xw_val, yw_val),
                           epochs=ep, batch_size=batch_sz, callbacks=[es], verbose=0)
 
-                # Rolling predictions on raw block (autoregressive on features)
-                preds, buf = [], [x.copy() for x in hist_X[-w:]]
-                for i in range(start, end):
-                    window_slice = np.array(buf[-w:], dtype=np.float32)
-                    if window_slice.shape != (w, hist_X.shape[1]):
-                        penalty += W_COLLAPSE
-                        preds = None
-                        break
-                    p = float(model.predict(window_slice[None, ...], verbose=0)[0, 0])
-                    preds.append(p)
-                    buf.append(X_val[i].copy())
-
-                if preds is None:
-                    hist_X = np.vstack([hist_X, X_val[start:end]])
-                    hist_y = np.concatenate([hist_y, y_val_for_train[start:end]])
-                    continue
+                # Predict entire block at once (many-to-one over sliding windows)
+                preds = model.predict(Xw_val, verbose=0).ravel().astype(float)
 
                 preds = np.asarray(preds, dtype=float)
-                mn, mx = float(preds.min()), float(preds.max())
-                if (mx - mn) < 1e-8:
+                if preds.size == 0 or not np.isfinite(preds).all():
                     penalty += W_COLLAPSE
                     hist_X = np.vstack([hist_X, X_val[start:end]])
                     hist_y = np.concatenate([hist_y, y_val_for_train[start:end]])
                     continue
 
-                thresh_val = mn + (mx - mn) * float(thr)
-                sig = (preds > thresh_val).astype(float)
+                # Percentile-based thresholds
+                q = float(np.clip(thr, 0.5, 0.95))
+                thr_enter = np.percentile(preds, q*100.0)
+                thr_exit  = np.percentile(preds, max(0.0, (q - HYSTERESIS))*100.0)
+
+                # MAD-based amplitude guardrail
+                med = float(np.median(preds))
+                mad = float(np.median(np.abs(preds - med))) + 1e-12
+                strong = (np.abs(preds - med) >= MAD_K * mad)
+
+                # Hysteresis stateful signal
+                sig = np.zeros_like(preds, dtype=float)
+                state = int(prev_sig_last > 0.5)
+                for t in range(preds.size):
+                    if state == 0:
+                        if (preds[t] >= thr_enter) and strong[t]:
+                            state = 1
+                    else:
+                        if (preds[t] < thr_exit) or (not strong[t]):
+                            state = 0
+                    sig[t] = float(state)
+
                 if sig.sum() == 0:
                     penalty += W_NO_TRADE
 

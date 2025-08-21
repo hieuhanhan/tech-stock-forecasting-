@@ -104,12 +104,8 @@ def main():
     outdir = Path(args.outdir)
     ensure_dir(outdir)
 
-    # Load data
-    # tier2 main (stage="GA"/"BO" rows) – not strictly needed for fronts, but you can use it if muốn
     df_all = load_df_or_empty(tier2_csv)
-    # Hypervolume history + finals
     hv_df = load_df_or_empty(hv_csv, required_cols=["fold_id","retrain_interval","stage","gen","hv","ref0","ref1","n_front"])
-    # Fronts
     fr_df = load_df_or_empty(front_csv, required_cols=["fold_id","retrain_interval","front_type","p","q","threshold","sharpe","mdd"])
 
     # -------- Global plots (all folds pooled) --------
@@ -121,8 +117,7 @@ def main():
     fig.tight_layout()
     fig.savefig(outdir / "arima_fronts_all_folds.png", dpi=160)
 
-    # Hypervolume summary: chỉ có ý nghĩa theo fold×interval, nhưng ta cũng có thể vẽ phân phối
-    # Ở đây: bảng so sánh cuối cùng (per fold×interval)
+
     if len(hv_df):
         piv = []
         for (fid, interval), g in hv_df.groupby(["fold_id","retrain_interval"]):

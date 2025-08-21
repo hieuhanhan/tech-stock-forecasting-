@@ -1,0 +1,20 @@
+[
+  {
+    "fold_id": 259,
+    "interval": 10,
+    "delta_sharpe": 0.7586290852681274,
+    "delta_mdd": 0.12648896522349537
+  },
+  {
+    "fold_id": 226,
+    "interval": 20,
+    "delta_sharpe": 0.2038570052221751,
+    "delta_mdd": 0.4944909482866114
+  },
+  {
+    "fold_id": 584,
+    "interval": 10,
+    "delta_sharpe": 0.06138088688384613,
+    "delta_mdd": 0.17668069143177942
+  }
+]

@@ -126,9 +126,9 @@ def _build_tuning_folds(selected_simple: List[dict],
 
 def main():
     p = argparse.ArgumentParser(description="Select representative folds and emit tuning_folds for ARIMA/LSTM.")
-    p.add_argument("--model_type", required=True, choices=["lstm", "arima"])
-    p.add_argument("--meta_json_path", required=True, help="Meta-features JSON (from build_meta_features)")
-    p.add_argument("--folds_summary_path", type=str, required=True, help="Path to folds_summary_{model}.json for enriching & tuning_folds")
+    p.add_argument("--model-type", required=True, choices=["lstm", "arima"])
+    p.add_argument("--meta-json-path", required=True, help="Meta-features JSON (from build_meta_features)")
+    p.add_argument("--folds-summary-path", type=str, required=True, help="Path to folds_summary_{model}.json for enriching & tuning_folds")
 
     # evaluation mode
     p.add_argument("--eval_only", action="store_true")
