@@ -18,8 +18,7 @@ from skopt.space import Integer, Real
 from skopt import gp_minimize
 
 from lstm_utils import (
-    Tier1LSTMProblem,   # objective wrapper (min RMSE on VAL)
-    infer_feature_cols,
+    Tier1LSTMProblem,   
     NON_FEATURE_KEEP,
 )
 

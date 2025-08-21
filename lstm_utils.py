@@ -574,8 +574,6 @@ def run_bo_parego(
     - eval_logger: optional callback(x, f, iter) -> None to record rows externally
     Returns a list of dict rows (stage='BO', params + Sharpe/MDD-like fields if objective fills stats_map).
     """
-    
-
     rng = np.random.default_rng(random_state)
     lb, ub = np.array(bounds[0], float), np.array(bounds[1], float)
     int_idx_set = set(int_indices or [])

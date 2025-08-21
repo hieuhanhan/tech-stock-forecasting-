@@ -1,41 +1,23 @@
-#!/usr/bin/env python3
-# tier1_lstm_tuning.py
 import json
-import argparse
 import logging
-import random
 from pathlib import Path
-
+import argparse
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-
-import tensorflow as tf
-from pymoo.optimize import minimize as pymoo_minimize
-from pymoo.algorithms.soo.nonconvex.ga import GA
-from skopt.space import Integer, Real
+import sys
 from skopt import gp_minimize
+from skopt.space import Integer
+from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.optimize import minimize as pymoo_minimize
 
-from lstm_utils import (
-    Tier1LSTMProblem,   # minimize RMSE on validation windows
-    infer_feature_cols,
-    NON_FEATURE_KEEP,
+from arima_utils import (
+    Tier1ARIMAProblem,   
+    arima_rmse,          
+    LOG_DIR
 )
 
-# ----------------- Defaults -----------------
-DEFAULT_BASE_DIR = Path("data/processed_folds")
-LOG_DIR = Path("logs/tier1_lstm")
-
-# Tier-1 search space for skopt: [window, layers, units, lr, batch_size]
-LSTM_SEARCH_SPACE = [
-    Integer(10, 40,    name="window"),
-    Integer(1, 3,      name="layers"),
-    Integer(32, 128,   name="units"),
-    Real(1e-4, 1e-2,   name="lr", prior="log-uniform"),
-    Integer(16, 128,   name="batch_size"),
-]
-
-# ----------------- Helpers -----------------
+# ---------- Helpers ----------
 def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
@@ -43,268 +25,259 @@ def load_json(path: Path):
     with path.open("r") as f:
         return json.load(f)
 
-def resolve_csv(base_dir: Path, rel_or_abs: str) -> Path:
-    p = Path(rel_or_abs)
-    return p if p.is_absolute() else (base_dir / rel_or_abs)
-
-def set_all_seeds(seed: int = 42):
-    random.seed(seed)
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
-
-def setup_tf_perf(enable_mixed_precision: bool = True, enable_xla: bool = True):
-    """Enable mixed precision + XLA on GPU and memory growth when available."""
-    try:
-        gpus = tf.config.list_physical_devices("GPU")
-        if gpus:
-            if enable_mixed_precision:
-                tf.keras.mixed_precision.set_global_policy("mixed_float16")
-            if enable_xla:
-                tf.config.optimizer.set_jit(True)  # XLA
-            for g in gpus:
-                tf.config.experimental.set_memory_growth(g, True)
-    except Exception:
-        pass
-
-def load_features(feature_path: Path, df_train: pd.DataFrame) -> list:
-    """Prefer feature list from JSON; otherwise infer numeric features (exclude NON_FEATURE_KEEP)."""
-    if feature_path and feature_path.exists():
-        feats = load_json(feature_path)
-        assert isinstance(feats, list) and all(isinstance(c, str) for c in feats), \
-            "feature JSON must be a list of strings"
-        feats = [c for c in feats if c in df_train.columns]
-        if not feats:
-            raise ValueError("No valid features from feature JSON exist in TRAIN columns.")
-        return feats
-
-    feats = infer_feature_cols(df_train)
-    if not feats:
-        cands = [c for c in df_train.columns if c not in NON_FEATURE_KEEP]
-        feats = [c for c in cands if pd.api.types.is_numeric_dtype(df_train[c])]
-    if not feats:
-        raise ValueError("Could not infer any valid numeric features.")
-    return feats
-
-def read_resume(json_path: Path):
-    """Return (results_list, done_set) to resume cleanly."""
-    if not json_path.exists():
-        return [], set()
-    obj = load_json(json_path)
-    results = obj["results"] if isinstance(obj, dict) and "results" in obj else obj
-    done = {int(r["fold_id"]) for r in results if "fold_id" in r}
-    return results, done
-
-def write_results(json_path: Path, csv_path: Path, results: list):
-    ensure_dir(json_path.parent)
-    with json_path.open("w") as f:
-        json.dump(results, f, indent=2)
+def append_rows_csv(rows: list[dict], csv_path: Path):
+    if not rows:
+        return
     ensure_dir(csv_path.parent)
-    pd.DataFrame(results).to_csv(csv_path, index=False)
+    df_new = pd.DataFrame(rows)
+    if csv_path.exists():
+        df_old = pd.read_csv(csv_path)
+        df_all = pd.concat([df_old, df_new], ignore_index=True)
+    else:
+        df_all = df_new
+    df_all.to_csv(csv_path, index=False)
 
-# ----------------- Main -----------------
+def pick_arima_feature(df: pd.DataFrame) -> str:
+    """Always use Log_Returns for ARIMA."""
+    if "Log_Returns" not in df.columns:
+        raise ValueError("Log_Returns not found")
+    return "Log_Returns"
+
+def load_tuning_folds(folds_path: Path) -> list[dict]:
+    """Load tuning folds JSON; accept either a list or a dict with key 'arima'."""
+    raw = load_json(folds_path)
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict) and "arima" in raw and isinstance(raw["arima"], list):
+        return raw["arima"]
+    raise ValueError(f"Unexpected JSON format in {folds_path}. Expected a list or a dict with key 'arima'.")
+
+def infer_base_dir_for_csvs(folds_path: Path) -> Path:
+    try:
+        return folds_path.parents[2].resolve() 
+    except IndexError:
+        return Path("data/processed_folds").resolve()
+
+# ---------- Main ----------
 def main():
-    parser = argparse.ArgumentParser("Tier-1 LSTM Tuning (paths come directly from lstm_tuning_folds.json)")
-    parser.add_argument('--folds-path', default='data/processed_folds/final/lstm/lstm_tuning_folds.json',
-                        help='JSON list of {fold_id, train_path, val_path, ticker?}.')
-    parser.add_argument('--feature-path', default='data/processed_folds/lstm_feature_columns.json',
-                        help='Optional JSON list of features to use; if missing, infer from TRAIN.')
-    parser.add_argument('--base-dir', default=str(DEFAULT_BASE_DIR),
-                        help='Base directory to resolve relative train/val CSV paths.')
-    parser.add_argument('--output-json', default='data/tuning_results/jsons/tier1_lstm.json')
-    parser.add_argument('--output-csv',  default='data/tuning_results/csv/tier1_lstm.csv')
+    parser = argparse.ArgumentParser("Tier 1 ARIMA Tuning (Log_Returns only)")
+    parser.add_argument('--folds-path', default='data/processed_folds/final/arima/arima_tuning_folds.json',
+                        help='JSON with train/val CSV paths per fold (list or {"arima":[...]})')
+    parser.add_argument('--output-json', default='data/tuning_results/jsons/tier1_arima.json')
+    parser.add_argument('--output-csv',  default='data/tuning_results/csv/tier1_arima.csv')
+    parser.add_argument('--ga-history-csv', default='data/tuning_results/csv/tier1_ga_history.csv')
+    parser.add_argument('--bo-history-csv', default='data/tuning_results/csv/tier1_bo_history.csv')
+
     parser.add_argument('--max-folds', type=int, default=None)
-    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--strict-paths', action='store_true', help='Raise on missing CSVs/columns')
 
-    # Per-evaluation knobs
-    parser.add_argument('--t1-epochs', type=int, default=10, help='Epochs per RMSE evaluation.')
-    parser.add_argument('--t1-patience', type=int, default=3, help='EarlyStopping patience.')
+    # search hyperparams (your flags)
+    parser.add_argument("--pop-size", type=int, default=40)
+    parser.add_argument("--ngen", type=int, default=40)
+    parser.add_argument("--n-calls", type=int, default=50)
+    parser.add_argument("--n-seeds", type=int, default=5)
 
-    # Search knobs (flexible)
-    parser.add_argument('--ga-pop-size', type=int, default=24, help='Population size for GA.')
-    parser.add_argument('--ga-n-gen', type=int, default=25, help='Number of GA generations.')
-    parser.add_argument('--bo-n-calls', type=int, default=40, help='Number of BO (skopt) calls.')
-    parser.add_argument('--top-n-seeds', type=int, default=12, help='Top GA individuals to warm-start BO.')
-
-    # Performance toggles
-    parser.add_argument('--no-mixed-precision', action='store_true', help='Disable mixed precision on GPU.')
-    parser.add_argument('--no-xla', action='store_true', help='Disable XLA JIT on GPU.')
+    # normalization flag
+    parser.add_argument("--rmse-normalize", action="store_true",
+                        help="Normalize RMSE by std(val) for scale-invariant scoring")
 
     args = parser.parse_args()
 
-    ensure_dir(LOG_DIR)
+    # Logging setup
+    ensure_dir(Path(LOG_DIR))
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
+        format='%(asctime)s [%(levelname)s] %(message)s',
         handlers=[
-            logging.FileHandler(LOG_DIR / "tier1_lstm.log"),
+            logging.FileHandler(Path(LOG_DIR) / "tier1_arima.log"),
             logging.StreamHandler()
-        ],
+        ]
     )
-
-    set_all_seeds(args.seed)
-    setup_tf_perf(enable_mixed_precision=not args.no_mixed_precision,
-                  enable_xla=not args.no_xla)
+    np.random.seed(42)
 
     ensure_dir(Path(args.output_json).parent)
     ensure_dir(Path(args.output_csv).parent)
 
-    base_dir = Path(args.base_dir)
+    # Load tuning folds
+    folds_path = Path(args.folds_path).resolve()
+    folds_list = load_tuning_folds(folds_path)
+    summary = {int(f["global_fold_id"]): f for f in folds_list if "global_fold_id" in f}
 
-    # ---- Load folds file (direct paths) ----
-    folds = load_json(Path(args.folds_path))
-    if not isinstance(folds, list):
-        raise ValueError("folds-path must be a JSON list of fold records.")
+    # Resume if exists
+    try:
+        results = load_json(Path(args.output_json))
+        if isinstance(results, dict):
+            results = results.get("results", [])
+        done = {r['fold_id'] for r in results}
+    except FileNotFoundError:
+        results, done = [], set()
 
+    all_fold_ids = sorted(summary.keys())
     if args.max_folds:
-        folds = folds[:args.max_folds]
+        all_fold_ids = all_fold_ids[:args.max_folds]
+    pending = [fid for fid in all_fold_ids if fid not in done]
 
-    # ---- Resume support ----
-    results, done = read_resume(Path(args.output_json))
-    pending = [rec for rec in folds if int(rec.get("fold_id", -1)) not in done]
+    # Base dir for CSVs (pointing to data/processed_folds)
+    base_dir = infer_base_dir_for_csvs(folds_path)
 
-    logging.info("Total folds: %d | pending: %d", len(folds), len(pending))
-
-    for rec in tqdm(pending, desc="Tier-1 LSTM"):
-        fid = int(rec.get("fold_id", -1))
-        if fid < 0:
-            logging.warning("Bad record (missing fold_id). Skipping: %s", rec)
+    # Tune each fold
+    for fid in tqdm(pending, desc='Tier1 ARIMA', leave=True, position=0, file=sys.stdout):
+        info = summary.get(fid)
+        if not info:
+            logging.warning(f"[WARN] Missing metadata for fid={fid}")
             continue
 
-        tr_rel = rec.get("train_path")
-        va_rel = rec.get("val_path")
-        if not tr_rel or not va_rel:
-            logging.warning("Fold %s missing train_path/val_path. Skipping.", fid)
+        train_rel = info.get("final_train_path") or info.get("train_path_arima")
+        val_rel   = info.get("final_val_path")   or info.get("val_path_arima")
+
+        if not train_rel or not val_rel:
+            msg = f"Missing train/val paths in metadata for fid={fid} (keys: final_* or *_arima)"
+            if args.strict_paths:
+                raise FileNotFoundError(msg)
+            logging.warning("[WARN] " + msg)
             continue
 
-        train_csv = resolve_csv(base_dir, tr_rel)
-        val_csv   = resolve_csv(base_dir, va_rel)
+        train_csv = (base_dir / train_rel).resolve()
+        val_csv   = (base_dir / val_rel).resolve()
+
         if not train_csv.exists() or not val_csv.exists():
-            logging.warning("Fold %s CSV not found: %s | %s. Skipping.", fid, train_csv, val_csv)
+            logging.warning(
+                "[WARN] Missing CSV for fid=%s | train_exists=%s | val_exists=%s | train=%s | val=%s",
+                fid, train_csv.exists(), val_csv.exists(), str(train_csv), str(val_csv)
+            )
+            if args.strict_paths:
+                raise FileNotFoundError(f"Missing CSV(s) for fid={fid}")
             continue
 
-        train_df = pd.read_csv(train_csv)
-        val_df   = pd.read_csv(val_csv)
-
-        # Resolve features
-        feat_path = Path(args.feature_path)
         try:
-            feature_cols = load_features(feat_path, train_df)
+            train = pd.read_csv(train_csv)
+            val   = pd.read_csv(val_csv)
         except Exception as e:
-            logging.warning("Feature load failed (%s). Falling back to inference.", e)
-            feature_cols = load_features(Path(""), train_df)
+            logging.warning(f"[WARN] Read CSV failed for fid={fid}: {e}")
+            if args.strict_paths:
+                raise
+            continue
 
-        # ---- GA (collect seeds): minimize RMSE on validation ----
-        problem = Tier1LSTMProblem(
-            train_df=train_df,
-            val_df=val_df,
-            feature_cols=feature_cols,
-            t1_epochs=args.t1_epochs,
-            patience=args.t1_patience,
-        )
-
-        algorithm = GA(
-            pop_size=args.ga_pop_size,
-            eliminate_duplicates=True,
-            save_history=True
-        )
-        res_ga = pymoo_minimize(
-            problem,
-            algorithm,
-            ('n_gen', args.ga_n_gen),
-            verbose=False,
-            return_algorithm=True
-        )
-
-        # Gather individuals from history; fallback to final pop if needed
-        individuals = []
         try:
-            for h in res_ga.algorithm.history:
-                if hasattr(h, "pop") and h.pop is not None:
-                    individuals.extend(h.pop)
-        except Exception:
-            pass
-        if not individuals:
-            individuals = list(getattr(res_ga, "pop", []))
+            feat = pick_arima_feature(train)
+        except ValueError as e:
+            if args.strict_paths: raise
+            logging.warning(f"[WARN] {e} -> skip fid={fid}")
+            continue
 
-        # Deduplicate by rounded X; keep (x, f) tuples
-        seen = set()
-        unique_pairs = []
-        for ind in individuals:
-            x = np.array(ind.X, dtype=float)
-            f = float(ind.F[0])
-            key = tuple(np.round(x, 6).tolist())
+        train_ret = pd.to_numeric(train[feat], errors="coerce").dropna().to_numpy()
+        val_ret   = pd.to_numeric(val[feat], errors="coerce").dropna().to_numpy()
+        if train_ret.size == 0 or val_ret.size == 0:
+            logging.warning(f"[WARN] Empty series for fid={fid} | train_len={train_ret.size} | val_len={val_ret.size}")
+            if args.strict_paths:
+                raise ValueError(f"Empty series for fid={fid}")
+            continue
+
+        # -------- GA Search (single-objective: RMSE) --------
+        algorithm = GA(pop_size=args.pop_size, eliminate_duplicates=True, save_history=True)
+        ga_rows = []
+        try:
+            res_ga = pymoo_minimize(
+                Tier1ARIMAProblem(train_ret, val_ret, normalize=args.rmse_normalize),
+                algorithm,
+                ('n_gen', args.ngen),
+                verbose=False,
+                return_algorithm=True,
+                seed=42
+            )
+            # dump all individuals per generation
+            best_rmse_so_far = np.inf
+            for gen_idx, gen in enumerate(res_ga.algorithm.history, start=1):
+                pop = getattr(gen, 'pop', [])
+                if not pop:
+                    continue
+                # best-of-generation for flag
+                gen_rmses = [float(ind.F[0]) for ind in pop]
+                gen_best = float(np.min(gen_rmses)) if len(gen_rmses) else np.inf
+                for ind in pop:
+                    p_, q_ = int(ind.X[0]), int(ind.X[1])
+                    rmse_ = float(ind.F[0])
+                    is_best_gen = (rmse_ == gen_best)
+                    ga_rows.append({
+                        "stage": "GA",
+                        "fold_id": int(fid),
+                        "gen": int(gen_idx),
+                        "p": p_,
+                        "q": q_,
+                        "rmse": rmse_,
+                        "is_best_gen": bool(is_best_gen),
+                    })
+                    best_rmse_so_far = min(best_rmse_so_far, rmse_)
+        except Exception as e:
+            logging.warning(f"[WARN] GA failed for fid={fid}: {e}")
+            ga_rows = []
+
+        append_rows_csv(ga_rows, Path(args.ga_history_csv))
+
+        seen, unique_seeds = set(), []
+        for row in sorted(ga_rows, key=lambda r: r["rmse"]):
+            key = (int(row["p"]), int(row["q"]))
             if key not in seen:
                 seen.add(key)
-                unique_pairs.append((x, f))
+                unique_seeds.append(row)
+        top_inds = unique_seeds[:args.n_seeds]
+        if top_inds:
+            x0 = [[int(r["p"]), int(r["q"])] for r in top_inds]
+            y0 = [float(r["rmse"]) for r in top_inds]
+        else:
+            x0 = [[1, 1]]
+            y0 = [arima_rmse([1, 1], train_ret, val_ret, normalize=args.rmse_normalize)]
 
-        if not unique_pairs:
-            logging.warning("Fold %s: GA produced no individuals. Skipping.", fid)
-            continue
-
-        # Sort ascending by RMSE (lower is better) and take top seeds
-        unique_pairs.sort(key=lambda t: t[1])
-        top_pairs = unique_pairs[:args.top_n_seeds]
-
-        x0 = [t[0].tolist() for t in top_pairs]
-        y0 = [t[1] for t in top_pairs]
-
-        # ---- BO (skopt) warm-started by GA ----
-        def bo_objective(x):
-            out = {}
-            # x = [window, layers, units, lr, batch_size]
-            problem._evaluate(x, out)
-            return float(out["F"][0])
-
-        res_bo = gp_minimize(
-            bo_objective,
-            dimensions=LSTM_SEARCH_SPACE,
-            n_calls=args.bo_n_calls,
+        # -------- BO Refinement (still RMSE) --------
+        bo_res = gp_minimize(
+            lambda x: arima_rmse(x, train_ret, val_ret, normalize=args.rmse_normalize),
+            dimensions=[Integer(1, 7), Integer(1, 7)],
+            n_calls=args.n_calls,
             x0=x0, y0=y0,
-            random_state=args.seed
+            random_state=42
         )
 
-        best = res_bo.x
-        best_rmse = float(res_bo.fun)
+        # log BO trajectory
+        bo_rows = []
+        best_so_far = np.inf
+        for it, (x_iter, f_iter) in enumerate(zip(bo_res.x_iters, bo_res.func_vals), start=1):
+            p_, q_ = int(x_iter[0]), int(x_iter[1])
+            rmse_ = float(f_iter)
+            best_so_far = min(best_so_far, rmse_)
+            bo_rows.append({
+                "stage": "BO",
+                "fold_id": int(fid),
+                "iter": int(it),
+                "p": p_,
+                "q": q_,
+                "rmse": rmse_,
+                "is_best_so_far": bool(rmse_ <= best_so_far + 1e-12),
+            })
+        append_rows_csv(bo_rows, Path(args.bo_history_csv))
 
-        logging.info(
-            "Fold %s | best: window=%d, layers=%d, units=%d, lr=%.6g, batch=%d | RMSE=%.5f",
-            fid, int(best[0]), int(best[1]), int(best[2]), float(best[3]), int(best[4]), best_rmse
-        )
-
-        # Keep top GA individuals for reference
-        top_ga = []
-        for x, f in top_pairs:
-            d = {
-                "window":     int(round(x[0])),
-                "layers":     int(round(x[1])),
-                "units":      int(round(x[2])),
-                "lr":         float(x[3]),
-                "batch_size": int(round(x[4])),
-                "rmse":       float(f),
-            }
-            top_ga.append(d)
-
+        # -------- Final result for this fold --------
         results.append({
-            "fold_id": int(fid),
-            "ticker":  rec.get("ticker"),
-            "champion": {
-                "window":     int(best[0]),
-                "layers":     int(best[1]),
-                "units":      int(best[2]),
-                "lr":         float(best[3]),
-                "batch_size": int(best[4]),
-            },
-            "rmse": float(best_rmse),
-            "top_ga": top_ga,
-            "features_used": feature_cols,
-            "train_csv": str(train_csv),
-            "val_csv": str(val_csv),
+            'fold_id': int(fid),
+            'best_params': {'p': int(bo_res.x[0]), 'd': 0, 'q': int(bo_res.x[1])},
+            'rmse': float(bo_res.fun),
+            'rmse_normalized': bool(args.rmse_normalize),
+            'feature': feat,
+            'top_ga': [
+                {'p': int(r["p"]), 'q': int(r["q"]), 'rmse': float(r["rmse"]), 'gen': int(r["gen"])}
+                for r in top_inds
+            ],
+            'pop_size': int(args.pop_size),
+            'n_gen': int(args.ngen),
+            'n_calls': int(args.n_calls),
+            'n_seeds': int(args.n_seeds),
         })
 
-        # Checkpoint after each fold
-        write_results(Path(args.output_json), Path(args.output_csv), results)
+        with Path(args.output_json).open('w') as f:
+            json.dump(results, f, indent=2)
 
-    logging.info("=== Tier-1 complete. Saved to %s / %s ===", args.output_json, args.output_csv)
+    # Final CSV (summary champions)
+    pd.DataFrame(results).to_csv(Path(args.output_csv), index=False)
+    logging.info('=== Tier 1 ARIMA complete ===')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

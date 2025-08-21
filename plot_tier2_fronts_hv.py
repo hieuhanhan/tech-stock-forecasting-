@@ -46,8 +46,8 @@ def plot_front_scatter(ax, df_ga, df_union, title):
             krow = df_union.iloc[kidx]
             ax.scatter([krow["mdd"]], [krow["sharpe"]], s=80, marker="*", label="knee (union)")
 
-    ax.set_xlabel("MDD ↓")
-    ax.set_ylabel("Sharpe ↑")
+    ax.set_xlabel("MDD")
+    ax.set_ylabel("Sharpe")
     ax.set_title(title)
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best")
@@ -116,7 +116,6 @@ def main():
     plot_front_scatter(ax, df_ga_front, df_union_front, "Pareto Fronts (All folds)")
     fig.tight_layout()
     fig.savefig(outdir / "arima_fronts_all_folds.png", dpi=160)
-
 
     if len(hv_df):
         piv = []

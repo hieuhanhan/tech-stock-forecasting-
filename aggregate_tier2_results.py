@@ -1,20 +1,3 @@
-#!/usr/bin/env python3
-# tier2_aggregate_plots.py
-"""
-Aggregate plots for Tier-2 results:
-- Boxplots of Sharpe/MDD/Ann Return across folds by retrain interval (optionally by source).
-- Mean equity curve ± std for each (interval, source) by recomputing traces.
-
-Inputs:
-  --backtest-csv : CSV from backtest (must include columns: fold_id,retrain_interval,source,p,q,threshold, test_*).
-  --test-csv     : Global TEST file with column 'Log_Returns' (used to rebuild traces).
-  --intervals    : Comma-separated list (e.g. 10,20,42)
-  --source-label : GA_knee | GA+BO_knee | all
-Outputs:
-  - PNG figures saved to --outdir
-  - CSV summary saved to --outdir/aggregate_summary.csv
-"""
-
 import os
 import argparse
 from pathlib import Path

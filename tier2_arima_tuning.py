@@ -14,7 +14,7 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize as pymoo_minimize
 from pymoo.indicators.hv import HV
 
-from arima_utils_cont import (
+from arima_utils import (
     suppress_warnings,
     create_continuous_arima_objective,
     Tier2MOGAProblem,
@@ -68,7 +68,6 @@ def dedup_results(rows: list[dict]) -> list[dict]:
     return uniq
 
 def append_rows_csv(rows: list[dict], path: Path):
-    """Append rows to CSV, creating header only once."""
     if not rows:
         return
     ensure_dir(path.parent)
@@ -125,16 +124,15 @@ class GARecorder:
                 "fold_id": int(self.fold_id),
                 "retrain_interval": int(self.interval),
                 "p": p, "q": q, "threshold": thr,
-                "sharpe": float(-f[0]),     # nhớ F0 = -Sharpe (min)
+                "sharpe": float(-f[0]),    
                 "mdd": float(f[1]),
                 "turnover": float(meta.get("turnover", np.nan)),
                 "penalty": float(meta.get("penalty", np.nan)),
                 "strategy": "continuous",
             })
 
-# -------- BO (ParEGO đơn giản với sklearn GP) --------
+# -------- BO --------
 def parego_scalarize(F, lam, rho=0.05):
-    # F min-min, chuẩn hóa về [0,1] theo cột
     F = np.asarray(F, dtype=float)
     Fn = (F - F.min(axis=0)) / (np.ptp(F, axis=0) + 1e-12)
     # augmented Tchebycheff
@@ -187,30 +185,24 @@ def run_bo_parego(
     # BO loop
     lb, ub = np.array(bounds[0], float), np.array(bounds[1], float)
     for it in range(1, n_iter + 1):
-        # lambda ~ Dirichlet(1,1) -> 2 mục tiêu
         w = float(rng.uniform(0.05, 0.95))
         lam = np.array([w, 1.0 - w], dtype=float)
 
-        # scalarize hiện tại
         F_arr = np.vstack(F_hist)
         y = parego_scalarize(F_arr, lam)  # minimize
 
-        # fit GP trên X -> y
         X_arr = np.vstack(X_hist)
-        # scale nhẹ features
         Xs = (X_arr - lb) / (ub - lb + 1e-12)
         kernel = C(1.0, (1e-3, 1e3)) * Matern(nu=2.5) + WhiteKernel(noise_level=1e-6)
         gp = GaussianProcessRegressor(kernel=kernel, alpha=1e-6, normalize_y=True, random_state=random_state)
         gp.fit(Xs, y)
 
-        # ứng viên ngẫu nhiên
         cand = rng.uniform(lb, ub, size=(n_pool, 3))
         cand[:,0] = np.clip(np.rint(cand[:,0]), 1, 7)
         cand[:,1] = np.clip(np.rint(cand[:,1]), 1, 7)
         # unique
         cand_unique = np.unique(cand, axis=0)
 
-        # loại trùng với lịch sử
         if len(X_hist) > 0:
             hist_unique = np.unique(np.vstack(X_hist), axis=0)
             # set difference approx: keep ones not in hist within tolerance
@@ -220,7 +212,6 @@ def run_bo_parego(
             cand_unique = cand_unique[mask]
 
         if cand_unique.shape[0] == 0:
-            # fallback random jitter quanh điểm tốt nhất hiện tại
             best_idx = int(np.argmin(y))
             center = X_arr[best_idx]
             jitter = rng.normal(scale=[0.5,0.5,0.02], size=(512,3))
@@ -463,7 +454,6 @@ def main():
             )
             all_rows.extend(dedup_results(bo_rows))
 
-            # ----- Pareto cuối: GA-only và GA∪BO (sau khi có BO) -----
             F_ga_final = res.F
             X_ga_final = res.X
             nd_ga = is_nondominated(F_ga_final)
