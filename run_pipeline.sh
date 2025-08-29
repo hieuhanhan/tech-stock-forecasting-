@@ -5,43 +5,38 @@ set -euo pipefail
 #                CONFIG                    #
 ############################################
 
-# --- AWS/S3 ---
+# --- AWS/S3 (ONLY RESULTS/L0GS) ---
 AWS_PROFILE="default"
 S3_BUCKET="s3://tech-stock-data-2025"
 S3_PREFIX="tuning_results/lstm_tier2"
-S3_CODE_URI="${S3_BUCKET}/${S3_PREFIX}/code"
 S3_RESULTS_URI="${S3_BUCKET}/${S3_PREFIX}/results"
 S3_LOGS_URI="${S3_BUCKET}/${S3_PREFIX}/logs"
 
-# --- REPO / LOCAL ---
-LOCAL_ROOT="/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting"
-LOCAL_CODE_DIR="${LOCAL_ROOT}"                      # repo root
-LOCAL_RESULTS_DIR="${LOCAL_ROOT}/_tuning_results"
+# --- LOCAL (MAC) ---
+LOCAL_RESULTS_DIR="/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/_tuning_results"
 
 # --- EC2 ---
-EC2_HOST="ec2-3-75-218-159.eu-central-1.compute.amazonaws.com"      # TODO: change
-EC2_KEY="/Users/duybui/Documents/Hieu-Han-Github/tech-stock-key.pem"        # TODO: change
-REMOTE_ROOT="/home/ec2-user/quant_runs"
-REMOTE_RUN_ID="$(date +%Y%m%d_%H%M%S)"
-REMOTE_WORK="${REMOTE_ROOT}/${REMOTE_RUN_ID}"
+EC2_HOST="ec2-3-75-218-159.eu-central-1.compute.amazonaws.com"       # <--- CHANGE
+EC2_KEY="/Users/duybui/Documents/Hieu-Han-Github/tech-stock-key.pem"    # <--- CHANGE (absolute path)
+REMOTE_REPO_DIR="/home/ec2-user/tech-stock-forecasting-"     # <--- repo path already cloned on EC2
 REMOTE_PYTHON="python3"
 REMOTE_AWS_PROFILE="default"
 
-# --- JOB (Tier-2 LSTM) ---
-PY_SCRIPT="tier2_lstm_tuning.py"
+# --- JOB (Tier-2 LSTM) on EC2 ---
+PY_SCRIPT="tier2_lstm_tuning.py"   # path relative to REMOTE_REPO_DIR
 FOLDS_JSON="data/processed_folds/final/lstm/lstm_tuning_folds_final_paths.json"
 TIER1_BACKBONE_JSON="data/tuning_results/jsons/tier1_lstm_backbone.json"
 FEATURES_JSON="data/processed_folds/lstm_feature_columns.json"
 
 RETRAIN_INTERVALS="10,20,42"
 POP_SIZE=20
-NGEN=18
+NGEN=15
 BO_ITERS=3
 
 TIER2_CSV="data/tuning_results/csv/tier2_lstm.csv"
 TIER2_JSON="data/tuning_results/jsons/tier2_lstm.json"
 
-# [Optional] limit folds per run (0 = all)
+# Optional: limit how many folds this session processes (0 = all)
 MAX_FOLDS=2
 
 ############################################
@@ -52,55 +47,41 @@ command -v ssh >/dev/null 2>&1 || { echo "ERROR: ssh not found"; exit 1; }
 mkdir -p "${LOCAL_RESULTS_DIR}"
 
 ############################################
-#     1) PUSH CODE & DATA TO S3 (LOCAL)    #
-############################################
-echo "==> Syncing code/data to ${S3_CODE_URI}"
-aws --profile "${AWS_PROFILE}" s3 sync "${LOCAL_CODE_DIR}/" "${S3_CODE_URI}/" \
-  --exclude ".git/*" \
-  --exclude ".venv/*" \
-  --exclude "__pycache__/*" \
-  --delete
-
-############################################
-#     2) RUN REMOTE JOB (ON EC2)           #
+#     1) RUN REMOTE JOB (ON EC2)           #
 ############################################
 echo "==> Starting remote job on EC2: ${EC2_HOST}"
-ssh -i "${EC2_KEY}" -o StrictHostKeyChecking=no "${EC2_HOST}" bash -s <<'REMOTE_SCRIPT'
+ssh -i "${EC2_KEY}" -o StrictHostKeyChecking=no "ec2-user@${EC2_HOST}" bash -s <<EOF
 set -euo pipefail
 
-# ====== REMOTE CONFIG (templated) ======
-REMOTE_AWS_PROFILE="{{REMOTE_AWS_PROFILE}}"
-S3_CODE_URI="{{S3_CODE_URI}}"
-S3_RESULTS_URI="{{S3_RESULTS_URI}}"
-S3_LOGS_URI="{{S3_LOGS_URI}}"
-REMOTE_WORK="{{REMOTE_WORK}}"
-REMOTE_PYTHON="{{REMOTE_PYTHON}}"
+# ====== REMOTE VARS ======
+REMOTE_AWS_PROFILE="${REMOTE_AWS_PROFILE}"
+REMOTE_REPO_DIR="${REMOTE_REPO_DIR}"
+REMOTE_PYTHON="${REMOTE_PYTHON}"
 
-PY_SCRIPT="{{PY_SCRIPT}}"
-FOLDS_JSON="{{FOLDS_JSON}}"
-TIER1_BACKBONE_JSON="{{TIER1_BACKBONE_JSON}}"
-FEATURES_JSON="{{FEATURES_JSON}}"
+PY_SCRIPT="${PY_SCRIPT}"
+FOLDS_JSON="${FOLDS_JSON}"
+TIER1_BACKBONE_JSON="${TIER1_BACKBONE_JSON}"
+FEATURES_JSON="${FEATURES_JSON}"
 
-RETRAIN_INTERVALS="{{RETRAIN_INTERVALS}}"
-POP_SIZE="{{POP_SIZE}}"
-NGEN="{{NGEN}}"
-BO_ITERS="{{BO_ITERS}}"
+RETRAIN_INTERVALS="${RETRAIN_INTERVALS}"
+POP_SIZE="${POP_SIZE}"
+NGEN="${NGEN}"
+BO_ITERS="${BO_ITERS}"
 
-TIER2_CSV="{{TIER2_CSV}}"
-TIER2_JSON="{{TIER2_JSON}}"
-MAX_FOLDS="{{MAX_FOLDS}}"
+TIER2_CSV="${TIER2_CSV}"
+TIER2_JSON="${TIER2_JSON}"
+MAX_FOLDS="${MAX_FOLDS}"
 
-echo "==> [EC2] Creating workdir: \${REMOTE_WORK}"
-mkdir -p "\${REMOTE_WORK}"
-cd "\${REMOTE_WORK}"
+S3_RESULTS_URI="${S3_RESULTS_URI}"
+S3_LOGS_URI="${S3_LOGS_URI}"
 
-echo "==> [EC2] Pulling latest code from S3"
-aws --profile "\${REMOTE_AWS_PROFILE}" s3 sync "\${S3_CODE_URI}/" "./" --delete
+echo "==> [EC2] cd to repo: \${REMOTE_REPO_DIR}"
+cd "\${REMOTE_REPO_DIR}"
 
-# # (Optional) venv
-# python3 -m venv .venv && source .venv/bin/activate
-# pip install -r requirements.txt
+# Optionally pull latest repo changes (uncomment if using Git updates)
+# git pull --rebase
 
+# Create a per-fold runner (no S3 code sync; just run locally on EC2)
 cat > per_fold_runner.py <<'PYEOF'
 import json, os, subprocess, sys
 
@@ -121,6 +102,7 @@ S3_RESULTS_URI = os.environ["S3_RESULTS_URI"]
 with open(FOLDS_JSON, "r") as f:
     folds = json.load(f)
 
+# Normalize possible wrapper
 if isinstance(folds, dict) and "selected_folds" in folds:
     folds = folds["selected_folds"]
 elif not isinstance(folds, list):
@@ -156,7 +138,7 @@ for rec in folds:
     except subprocess.CalledProcessError as e:
         print(f"[WARN] Fold {gid} failed: {e}", flush=True)
 
-    # sync kết quả sau mỗi fold (CSV/JSON)
+    # Sync results (CSV/JSON) to S3 after each fold
     subprocess.run([
         "aws","--profile", REMOTE_AWS_PROFILE, "s3","sync",
         "data/tuning_results", f"{S3_RESULTS_URI}/data_tuning_results",
@@ -168,7 +150,7 @@ for rec in folds:
         break
 PYEOF
 
-echo "==> [EC2] Running per-fold runner"
+echo "==> [EC2] Run per-fold runner"
 REMOTE_LOG="remote_run_\$(date +%Y%m%d_%H%M%S).log"
 ( REMOTE_AWS_PROFILE="\${REMOTE_AWS_PROFILE}" \
   S3_RESULTS_URI="\${S3_RESULTS_URI}" \
@@ -186,11 +168,11 @@ REMOTE_LOG="remote_run_\$(date +%Y%m%d_%H%M%S).log"
   "\${REMOTE_PYTHON}" per_fold_runner.py ) 2>&1 | tee "\${REMOTE_LOG}"
 
 aws --profile "\${REMOTE_AWS_PROFILE}" s3 cp "\${REMOTE_LOG}" "\${S3_LOGS_URI}/\${REMOTE_LOG}"
-echo "==> [EC2] Done. Logs: \${S3_LOGS_URI}/\${REMOTE_LOG}"
-REMOTE_SCRIPT
+echo "==> [EC2] Logs pushed to \${S3_LOGS_URI}/\${REMOTE_LOG}"
+EOF
 
 ############################################
-#  3) PULL RESULTS BACK TO LOCAL (NEW)     #
+#  2) PULL RESULTS BACK TO LOCAL           #
 ############################################
 echo "==> Pulling results back to LOCAL: ${LOCAL_RESULTS_DIR}"
 mkdir -p "${LOCAL_RESULTS_DIR}"
