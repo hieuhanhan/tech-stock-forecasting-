@@ -16,7 +16,7 @@ S3_LOGS_URI="${S3_BUCKET}/${S3_PREFIX}/logs"
 LOCAL_RESULTS_DIR="/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/_tuning_results"
 
 # --- EC2 ---
-EC2_HOST="ec2-3-75-218-159.eu-central-1.compute.amazonaws.com"       # <--- CHANGE
+EC2_HOST="ec2-18-192-8-18.eu-central-1.compute.amazonaws.com"       # <--- CHANGE
 EC2_KEY="/Users/duybui/Documents/Hieu-Han-Github/tech-stock-key.pem"    # <--- CHANGE (absolute path)
 REMOTE_REPO_DIR="/home/ec2-user/tech-stock-forecasting-"     # <--- repo path already cloned on EC2
 REMOTE_PYTHON="python3"
