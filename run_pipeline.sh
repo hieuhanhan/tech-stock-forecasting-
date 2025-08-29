@@ -34,9 +34,9 @@ TIER1_BACKBONE_JSON="data/tuning_results/jsons/tier1_lstm_backbone.json"
 FEATURES_JSON="data/processed_folds/lstm_feature_columns.json"
 
 RETRAIN_INTERVALS="10,20,42"
-POP_SIZE=25
-NGEN=20
-BO_ITERS=5
+POP_SIZE=20
+NGEN=18
+BO_ITERS=3
 
 TIER2_CSV="data/tuning_results/csv/tier2_lstm.csv"
 TIER2_JSON="data/tuning_results/jsons/tier2_lstm.json"
