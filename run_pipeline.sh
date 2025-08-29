@@ -6,6 +6,7 @@ set -euo pipefail
 ############################################
 
 # --- AWS/S3 ---
+AWS_PROFILE="default"
 S3_BUCKET="s3://tech-stock-data-2025"
 S3_PREFIX="tuning_results/lstm_tier2"
 S3_CODE_URI="${S3_BUCKET}/${S3_PREFIX}/code"
