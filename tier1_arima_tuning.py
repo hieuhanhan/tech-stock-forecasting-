@@ -38,13 +38,11 @@ def append_rows_csv(rows: list[dict], csv_path: Path):
     df_all.to_csv(csv_path, index=False)
 
 def pick_arima_feature(df: pd.DataFrame) -> str:
-    """Always use Log_Returns for ARIMA."""
     if "Log_Returns" not in df.columns:
         raise ValueError("Log_Returns not found")
     return "Log_Returns"
 
 def load_tuning_folds(folds_path: Path) -> list[dict]:
-    """Load tuning folds JSON; accept either a list or a dict with key 'arima'."""
     raw = load_json(folds_path)
     if isinstance(raw, list):
         return raw
@@ -128,7 +126,7 @@ def main():
             continue
 
         train_rel = info.get("final_train_path") or info.get("train_path_arima")
-        val_rel   = info.get("final_val_path")   or info.get("val_path_arima")
+        val_rel = info.get("final_val_path") or info.get("val_path_arima")
 
         if not train_rel or not val_rel:
             msg = f"Missing train/val paths in metadata for fid={fid} (keys: final_* or *_arima)"
@@ -138,7 +136,7 @@ def main():
             continue
 
         train_csv = (base_dir / train_rel).resolve()
-        val_csv   = (base_dir / val_rel).resolve()
+        val_csv = (base_dir / val_rel).resolve()
 
         if not train_csv.exists() or not val_csv.exists():
             logging.warning(

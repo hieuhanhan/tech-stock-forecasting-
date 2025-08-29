@@ -33,9 +33,6 @@ def _save_json(obj, path: str):
 def _enrich_selected_with_dates(meta_rows: List[dict],
                                 sel_idx: List[int],
                                 folds_summary_path: str) -> List[dict]:
-    """Trả về selected_folds [{rank, global_fold_id, ticker, date_min, date_max}] như cũ,
-    nhưng ưu tiên lấy date_min/date_max từ chính meta nếu có; nếu thiếu thì fallback
-    vào CSV trong folds_summary."""
     selected_simple = []
     summary_map = {}
     if folds_summary_path and os.path.exists(folds_summary_path):

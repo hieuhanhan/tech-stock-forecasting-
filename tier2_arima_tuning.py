@@ -1,3 +1,10 @@
+"""
+Tier-2 ARIMA (NSGA-II + BO/ParEGO) — Continuous sizing
+- Multi-objective: maximize Sharpe, minimize MDD (we minimize [-Sharpe, MDD])
+- Seeds from Tier-1 (best p, q) -> NSGA-II exploration -> BO/ParEGO refinement
+- Auto/forced GARCH innovations (normal vs student-t) with IC selection (AIC/BIC/HQIC)
+- Full tracing of distribution choice + ICs into CSV logs
+"""
 import os, json, logging
 from pathlib import Path
 import argparse
@@ -76,7 +83,8 @@ def append_rows_csv(rows: list[dict], path: Path):
 
 # -------- GA callback recorder --------
 class GARecorder:
-    def __init__(self, fold_id, interval, objective, hv_log_list, ga_rows_list, seed=42):
+    def __init__(self, fold_id, interval, objective, hv_log_list, ga_rows_list, seed=42,
+                 garch_mode="auto", garch_ic="aic"):
         self.fold_id = int(fold_id)
         self.interval = int(interval)
         self.obj = objective      # callable with .stats_map
@@ -84,6 +92,9 @@ class GARecorder:
         self.ga_rows = ga_rows_list
         self.seed = seed
         self._ref = None          # hypervolume ref-point
+        self.garch_mode = str(garch_mode)
+        self.garch_ic = str(garch_ic)       # hypervolume ref-point
+
     def __call__(self, algo):
         gen = int(algo.n_gen)
         pop = algo.pop
@@ -93,29 +104,33 @@ class GARecorder:
         F_nd = F[nd_mask]; X_nd = X[nd_mask]
 
         # set/update ref-point once (stable across generations)
-        if self._ref is None:
+        if self._ref is None and F.shape[0] > 0:
             ref0 = float(F[:,0].max()) * 1.1 + 1e-6
             ref1 = float(F[:,1].max()) * 1.1 + 1e-6
             self._ref = np.array([ref0, ref1], dtype=float)
-        hv = HV(ref_point=self._ref)(F_nd)
-        self.hv_log.append({
-            "fold_id": self.fold_id,
-            "retrain_interval": self.interval,
-            "stage": "GA",
-            "gen": gen,
-            "hv": float(hv),
-            "ref0": float(self._ref[0]),
-            "ref1": float(self._ref[1]),
-            "n_front": int(F_nd.shape[0]),
-        })
 
-        # dump all ND points of this gen with metadata (turnover from stats_map)
+        if self._ref is not None and F_nd.shape[0] > 0:
+            hv = HV(ref_point=self._ref)(F_nd)
+            self.hv_log.append({
+                "fold_id": self.fold_id,
+                "retrain_interval": self.interval,
+                "stage": "GA",
+                "gen": gen,
+                "hv": float(hv),
+                "ref0": float(self._ref[0]),
+                "ref1": float(self._ref[1]),
+                "n_front": int(F_nd.shape[0]),
+            })
+
+        # dump ND points with metadata (turnover + GARCH dist trace if available)
         stats_map = getattr(self.obj, "stats_map", {})
         for x, f in zip(X_nd, F_nd):
             p = int(np.clip(np.rint(x[0]), 1, 7))
             q = int(np.clip(np.rint(x[1]), 1, 7))
-            thr = float(x[2]); key = (p, q, round(thr, 6))
+            thr = float(x[2])
+            key = (p, q, round(thr, 6))
             meta = stats_map.get(key, {})
+
             self.ga_rows.append({
                 "stage": "GA",
                 "seed": int(self.seed),
@@ -124,18 +139,24 @@ class GARecorder:
                 "fold_id": int(self.fold_id),
                 "retrain_interval": int(self.interval),
                 "p": p, "q": q, "threshold": thr,
-                "sharpe": float(-f[0]),    
+                "sharpe": float(-f[0]),        # f0 = -Sharpe
                 "mdd": float(f[1]),
                 "turnover": float(meta.get("turnover", np.nan)),
                 "penalty": float(meta.get("penalty", np.nan)),
                 "strategy": "continuous",
+                # --- GARCH tracing ---
+                "garch_mode": self.garch_mode,
+                "garch_ic": self.garch_ic,
+                "dist": meta.get("dist_majority", None),
+                "dist_last": meta.get("dist_last", None),
+                "aic_norm": meta.get("aic_norm", np.nan),
+                "aic_t": meta.get("aic_t", np.nan),
             })
 
 # -------- BO --------
 def parego_scalarize(F, lam, rho=0.05):
     F = np.asarray(F, dtype=float)
     Fn = (F - F.min(axis=0)) / (np.ptp(F, axis=0) + 1e-12)
-    # augmented Tchebycheff
     g = np.max(lam * Fn, axis=1) + rho * np.sum(lam * Fn, axis=1)
     return g
 
@@ -153,6 +174,8 @@ def run_bo_parego(
     random_state=42,
     fold_id=0,
     interval=10,
+    garch_mode="auto",
+    garch_ic="aic",
 ):
     rng = np.random.default_rng(random_state)
     X_hist = [np.array([int(round(x[0])), int(round(x[1])), float(x[2])], dtype=float) for x in init_X]
@@ -174,11 +197,18 @@ def run_bo_parego(
             "fold_id": int(fold_id),
             "retrain_interval": int(interval),
             "p": p, "q": q, "threshold": thr,
-            "sharpe": float(-(f[0])),   # F0 = -Sharpe
+            "sharpe": float(-(f[0])),
             "mdd": float(f[1]),
             "turnover": float(meta.get("turnover", np.nan)),
             "penalty": float(meta.get("penalty", np.nan)),
             "strategy": "continuous",
+            # --- GARCH tracing ---
+            "garch_mode": str(garch_mode),
+            "garch_ic": str(garch_ic),
+            "dist": meta.get("dist_majority", None),
+            "dist_last": meta.get("dist_last", None),
+            "aic_norm": meta.get("aic_norm", np.nan),
+            "aic_t": meta.get("aic_t", np.nan),
         })
         return f
 
@@ -200,7 +230,6 @@ def run_bo_parego(
         cand = rng.uniform(lb, ub, size=(n_pool, 3))
         cand[:,0] = np.clip(np.rint(cand[:,0]), 1, 7)
         cand[:,1] = np.clip(np.rint(cand[:,1]), 1, 7)
-        # unique
         cand_unique = np.unique(cand, axis=0)
 
         if len(X_hist) > 0:
@@ -238,7 +267,7 @@ def run_bo_parego(
 # ---------------- Main ----------------
 def main():
     parser = argparse.ArgumentParser("Tier-2 ARIMA (NSGA-II + BO/ParEGO) — CONTINUOUS sizing")
-    parser.add_argument("--folds-path", default="data/processed_folds/final/arima/arima_tuning_folds.json")
+    parser.add_argument("--folds-path", default="data/processed_folds/final/arima/arima_tuning_folds_final_paths.json")
     parser.add_argument("--tier1-json",  default="data/tuning_results/jsons/tier1_arima.json")
     parser.add_argument("--tier2-json",  default="data/tuning_results/jsons/tier2_arima_cont_gabo.json")
     parser.add_argument("--tier2-csv",   default="data/tuning_results/csv/tier2_arima_cont_gabo.csv")
@@ -259,6 +288,19 @@ def main():
     parser.add_argument("--bo-pool", type=int, default=2000)
     parser.add_argument("--bo-kmeans", type=int, default=3)
     parser.add_argument("--max-folds", type=int, default=None)
+
+    # GARCH options
+    parser.add_argument(
+        "--garch-dist", default="auto",
+        choices=["auto", "normal", "t"],
+        help="Innovations for GARCH(1,1): 'auto' selects by IC per block; otherwise force 'normal' or 't'."
+    )
+    parser.add_argument(
+        "--garch-ic", default="aic",
+        choices=["aic", "bic", "hqic"],
+        help="Information criterion for --garch-dist=auto (default=aic)."
+    )
+
     parser.add_argument("--strict-paths", action="store_true")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
@@ -279,6 +321,8 @@ def main():
     ensure_dir(Path(args.tier2_json).parent)
     ensure_dir(Path(args.tier2_csv).parent)
     hv_path = Path(args.tier2_csv).with_name(Path(args.tier2_csv).stem + "_hv.csv")
+    front_path = Path(args.tier2_csv).with_name(Path(args.tier2_csv).stem + "_front.csv")
+    knee_path = Path(args.tier2_csv).with_name(Path(args.tier2_csv).stem + "_knee.csv")
 
     # ----- Load meta & folds -----
     reps_ids = load_json(Path(args.folds_path))
@@ -364,7 +408,7 @@ def main():
         pq_seeds = neighbor_params(p0, q0)
 
         for interval in retrain_intervals:
-            # build objective
+            # build objective (pass garch_dist + garch_ic)
             obj = create_continuous_arima_objective(
                 train=train_ret,
                 val=val_ret,
@@ -377,6 +421,8 @@ def main():
                 thr_min=args.thr_min,
                 thr_max=args.thr_max,
                 pos_clip=args.pos_clip,
+                garch_dist=args.garch_dist,
+                garch_ic=args.garch_ic,
             )
 
             # Seeds: random threshold per (p,q)
@@ -387,7 +433,8 @@ def main():
             problem = Tier2MOGAProblem(obj, thr_bounds=(args.thr_min, args.thr_max))
 
             ga_rows = []
-            recorder = GARecorder(fid, interval, obj, hv_rows, ga_rows, seed=42)
+            recorder = GARecorder(fid, interval, obj, hv_rows, ga_rows, seed=42,
+                                  garch_mode=args.garch_dist, garch_ic=args.garch_ic)
 
             res = pymoo_minimize(
                 problem,
@@ -398,13 +445,15 @@ def main():
                 callback=recorder
             )
 
-            # --- taking the final pareto front of GA ---
+            # --- Final GA Pareto front ---
             if res.F is None or res.X is None or res.F.shape[0] == 0:
                 logging.debug(f"[Fold {fid}] NSGA-II returned no solutions.")
                 continue
 
-            # GA rows (ND) + final front (in ga_rows) -> append
+            # Append GA rows & log HV per-gen
             all_rows.extend(dedup_results(ga_rows))
+            append_rows_csv(hv_rows, hv_path)
+            hv_rows.clear()
 
             # Pareto's final GA
             F_ga = res.F    # objective values (minimize): [-Sharpe, MDD]
@@ -415,17 +464,14 @@ def main():
 
             if F_front.size == 0:
                 logging.debug(f"[Fold {fid}][int {interval}] GA front empty → skip BO & union/HV")
-                # flush GA per-gen HV before continue
-                append_rows_csv(hv_rows, hv_path)
-                hv_rows.clear()
                 continue
 
-            # --- seed selector for BO: biên + knee + diversify ---
+            # --- BO seed selection: extreme & knee + cluster centers ---
             idx_f0 = int(np.argmin(F_front[:, 0]))   # min f0 = max Sharpe
             idx_f1 = int(np.argmin(F_front[:, 1]))   # min f1 = min MDD
             idx_knee = knee_index(F_front)
-
             sel_idx = {idx_f0, idx_f1, idx_knee}
+
             k = min(args.bo_kmeans, F_front.shape[0])
             if k >= 2:
                 km = KMeans(n_clusters=k, random_state=42, n_init="auto")
@@ -439,7 +485,7 @@ def main():
             seeds_X = [X_front[i] for i in sorted(sel_idx)]
             seeds_F = [F_front[i] for i in sorted(sel_idx)]
 
-            # --- Chạy BO (ParEGO) ---
+            # --- BO (ParEGO) ---
             bounds = ([1, 1, args.thr_min], [7, 7, args.thr_max])
             bo_rows = run_bo_parego(
                 objective=obj,
@@ -451,6 +497,8 @@ def main():
                 random_state=42,
                 fold_id=fid,
                 interval=interval,
+                garch_mode=args.garch_dist,
+                garch_ic=args.garch_ic,
             )
             all_rows.extend(dedup_results(bo_rows))
 
@@ -476,19 +524,69 @@ def main():
             F_union_front = F_union[nd_union]
             X_union_front = X_union[nd_union]
 
+            # ----- Save fronts with dist meta (if available) -----
+            front_rows = []
+            # GA-only
+            for x, f in zip(X_ga_front, F_ga_front):
+                p_i, q_i, thr_i = int(round(x[0])), int(round(x[1])), float(x[2])
+                meta = getattr(obj, "stats_map", {}).get((p_i, q_i, round(thr_i, 6)), {})
+                front_rows.append({
+                    "fold_id": int(fid),
+                    "retrain_interval": int(interval),
+                    "front_type": "GA",
+                    "p": p_i, "q": q_i,
+                    "threshold": thr_i,
+                    "sharpe": float(-f[0]),
+                    "mdd": float(f[1]),
+                    "garch_mode": args.garch_dist,
+                    "garch_ic": args.garch_ic,
+                    "dist": meta.get("dist_majority", None),
+                    "dist_last": meta.get("dist_last", None),
+                    "aic_norm": meta.get("aic_norm", np.nan),
+                    "aic_t": meta.get("aic_t", np.nan),
+                })
+            # Union GA+BO
+            for x, f in zip(X_union_front, F_union_front):
+                p_i, q_i, thr_i = int(round(x[0])), int(round(x[1])), float(x[2])
+                meta = getattr(obj, "stats_map", {}).get((p_i, q_i, round(thr_i, 6)), {})
+                front_rows.append({
+                    "fold_id": int(fid),
+                    "retrain_interval": int(interval),
+                    "front_type": "GA+BO",
+                    "p": p_i, "q": q_i,
+                    "threshold": thr_i,
+                    "sharpe": float(-f[0]),
+                    "mdd": float(f[1]),
+                    "garch_mode": args.garch_dist,
+                    "garch_ic": args.garch_ic,
+                    "dist": meta.get("dist_majority", None),
+                    "dist_last": meta.get("dist_last", None),
+                    "aic_norm": meta.get("aic_norm", np.nan),
+                    "aic_t": meta.get("aic_t", np.nan),
+                })
+            append_rows_csv(front_rows, front_path)
+
+            # ----- Knee pick from union -----
             if F_union_front.size:
                 k_idx = knee_index(F_union_front)
+                p_k, q_k, thr_k = int(round(X_union_front[k_idx, 0])), int(round(X_union_front[k_idx, 1])), float(X_union_front[k_idx, 2])
+                k_meta = getattr(obj, "stats_map", {}).get((p_k, q_k, round(thr_k, 6)), {})
                 knee = {
                     "fold_id": int(fid),
                     "retrain_interval": int(interval),
-                    "p": int(round(X_union_front[k_idx, 0])),
-                    "q": int(round(X_union_front[k_idx, 1])),
-                    "threshold": float(X_union_front[k_idx, 2]),
+                    "p": p_k,
+                    "q": q_k,
+                    "threshold": thr_k,
                     "sharpe": float(-F_union_front[k_idx, 0]),
                     "mdd": float(F_union_front[k_idx, 1]),
-                    "pick": "knee_union"
+                    "pick": "knee_union",
+                    "garch_mode": args.garch_dist,
+                    "garch_ic": args.garch_ic,
+                    "dist": k_meta.get("dist_majority", None),
+                    "dist_last": k_meta.get("dist_last", None),
+                    "aic_norm": k_meta.get("aic_norm", np.nan),
+                    "aic_t": k_meta.get("aic_t", np.nan),
                 }
-                knee_path = Path(args.tier2_csv).with_name(Path(args.tier2_csv).stem + "_knee.csv")
                 append_rows_csv([knee], knee_path)
 
             # ----- Hypervolume: GA-only vs GA∪BO (used with ref-point) -----
@@ -500,55 +598,29 @@ def main():
             hv_final_ga = float(hv_metric(F_ga_front)) if F_ga_front.size else np.nan
             hv_final_union = float(hv_metric(F_union_front)) if F_union_front.size else np.nan
 
-            hv_rows.append({
-                "fold_id": int(fid),
-                "retrain_interval": int(interval),
-                "stage": "final_ga",
-                "gen": -1,
-                "hv": hv_final_ga,
-                "ref0": ref0,
-                "ref1": ref1,
-                "n_front": int(F_ga_front.shape[0]),
-            })
-            hv_rows.append({
-                "fold_id": int(fid),
-                "retrain_interval": int(interval),
-                "stage": "final_union",
-                "gen": -1,
-                "hv": hv_final_union,
-                "ref0": ref0,
-                "ref1": ref1,
-                "n_front": int(F_union_front.shape[0]),
-            })
-
-            # ---- Flush HV logs for this fold×interval (append mode) ----
+            hv_rows = [
+                {
+                    "fold_id": int(fid),
+                    "retrain_interval": int(interval),
+                    "stage": "final_ga",
+                    "gen": -1,
+                    "hv": hv_final_ga,
+                    "ref0": ref0,
+                    "ref1": ref1,
+                    "n_front": int(F_ga_front.shape[0]),
+                },
+                {
+                    "fold_id": int(fid),
+                    "retrain_interval": int(interval),
+                    "stage": "final_union",
+                    "gen": -1,
+                    "hv": hv_final_union,
+                    "ref0": ref0,
+                    "ref1": ref1,
+                    "n_front": int(F_union_front.shape[0]),
+                },
+            ]
             append_rows_csv(hv_rows, hv_path)
-            hv_rows.clear()
-
-            # ---- Save fronts (append) ----
-            front_path = Path(args.tier2_csv).with_name(Path(args.tier2_csv).stem + "_front.csv")
-            front_rows = []
-            for x, f in zip(X_ga_front, F_ga_front):
-                front_rows.append({
-                    "fold_id": int(fid),
-                    "retrain_interval": int(interval),
-                    "front_type": "GA",
-                    "p": int(round(x[0])), "q": int(round(x[1])),
-                    "threshold": float(x[2]),
-                    "sharpe": float(-f[0]),
-                    "mdd": float(f[1]),
-                })
-            for x, f in zip(X_union_front, F_union_front):
-                front_rows.append({
-                    "fold_id": int(fid),
-                    "retrain_interval": int(interval),
-                    "front_type": "GA+BO",
-                    "p": int(round(x[0])), "q": int(round(x[1])),
-                    "threshold": float(x[2]),
-                    "sharpe": float(-f[0]),
-                    "mdd": float(f[1]),
-                })
-            append_rows_csv(front_rows, front_path)
 
             # ---- Save all GA/BO rows (dedup) ----
             all_rows = dedup_results(all_rows)

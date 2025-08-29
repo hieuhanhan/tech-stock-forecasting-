@@ -1,9 +1,9 @@
+#!/usr/bin/env python3
 import json
 import argparse
 import logging
 import random
 from pathlib import Path
-from itertools import product
 
 import numpy as np
 import pandas as pd
@@ -12,19 +12,20 @@ from tqdm import tqdm
 import tensorflow as tf
 from pymoo.optimize import minimize as pymoo_minimize
 from pymoo.algorithms.soo.nonconvex.ga import GA
-from pymoo.core.problem import ElementwiseProblem
 
-from skopt.space import Integer, Real
+from skopt.space import Integer, Real, Space
 from skopt import gp_minimize
+from skopt.utils import check_x_in_space  # <-- use this instead of Space.contains
 
+# ---- Import your utils (new strategy) ----
 from lstm_utils import (
-    Tier1LSTMProblem,   
+    Tier1LSTMBackboneProblem,   # varies only (layers, batch_size, dropout)
     NON_FEATURE_KEEP,
 )
 
 # ----------------- Defaults -----------------
 PROCESSED_BASE = Path("data/processed_folds")
-LOG_DIR = Path("logs/tier1_lstm")
+LOG_DIR = Path("logs/tier1_lstm_backbone")
 
 # ----------------- Helpers -----------------
 def ensure_dir(p: Path):
@@ -51,34 +52,30 @@ def set_all_seeds(seed: int = 42):
     tf.random.set_seed(seed)
 
 def setup_tf_perf():
-    """Enable mixed precision + XLA on GPU and memory growth when available."""
     try:
         gpus = tf.config.list_physical_devices("GPU")
         if gpus:
             tf.keras.mixed_precision.set_global_policy("mixed_float16")
-            tf.config.optimizer.set_jit(True)  # XLA
+            tf.config.optimizer.set_jit(True)
             for g in gpus:
                 tf.config.experimental.set_memory_growth(g, True)
     except Exception:
         pass
 
 def load_features(feature_path: Path | None, df_train: pd.DataFrame) -> list:
-    # Priority 1: use PCA columns if exist
+    # Priority 1: PCA columns if exist
     pc_cols = [c for c in df_train.columns if c.startswith("PC")]
     if pc_cols:
-        return sorted(pc_cols, key=lambda x: int(x[2:]))  # PC1, PC2...
-    
-    # Priority 2: if feature JSON exists, use intersection
+        return sorted(pc_cols, key=lambda x: int(x[2:]))
+    # Priority 2: feature JSON
     if feature_path and feature_path.exists():
         feats = [c for c in load_json(feature_path) if c in df_train.columns]
         if feats:
             return feats
-    
-    # Priority 3: fallback infer
+    # Fallback: infer
     return [c for c in df_train.columns if c not in NON_FEATURE_KEEP]
 
 def read_resume(json_path: Path):
-    """Return (results_list, done_set) to resume cleanly."""
     if not json_path.exists():
         return [], set()
     obj = load_json(json_path)
@@ -94,7 +91,6 @@ def write_results(json_path: Path, csv_path: Path, results: list):
     pd.DataFrame(results).to_csv(csv_path, index=False)
 
 def coerce_fold_record(rec: dict) -> dict:
-    """Flexible record: choose id & train/val from several possible keys."""
     fid = rec.get("global_fold_id", rec.get("fold_id", None))
     if fid is None:
         raise ValueError("Fold record missing 'global_fold_id' or 'fold_id'.")
@@ -109,137 +105,48 @@ def coerce_fold_record(rec: dict) -> dict:
         ticker=rec.get("ticker", None)
     )
 
-def have_gpu() -> bool:
-    try:
-        return len(tf.config.list_physical_devices("GPU")) > 0
-    except Exception:
-        return False
-
-# ---------- Dynamic bounds & seeds ----------
-def make_dynamic_bounds(n_features: int, n_train: int, gpu: bool):
-    """
-    Return (xl, xu) arrays and skopt dimensions with dynamic limits.
-    """
-    # window
-    if n_features <= 20:
-        w_min, w_max = 10, 30
-        units_min, units_max = 16, 48
-        batch_min, batch_max = 16, 64
-    elif n_features <= 60:
-        w_min, w_max = 20, 40
-        units_min, units_max = 32, (96 if gpu else 64)
-        batch_min, batch_max = 32, 96
-    else:
-        w_min, w_max = 20, 40
-        units_min, units_max = 48, (128 if gpu else 96)
-        batch_min, batch_max = 32, 128
-
-    # dataset length heuristic
-    if n_train < 10_000:
-        units_max = min(units_max, 64)
-
-    # layers & lr fixed range
-    layers_min, layers_max = 1, 3
-    lr_min, lr_max = 1e-4, 1e-2
-
-    xl = np.array([w_min, layers_min, units_min, lr_min, batch_min], dtype=float)
-    xu = np.array([w_max, layers_max, units_max, lr_max, batch_max], dtype=float)
-
-    sk_dims = [
-        Integer(w_min, w_max, name="window"),
-        Integer(layers_min, layers_max, name="layers"),
-        Integer(units_min, units_max, name="units"),
-        Real(lr_min, lr_max, name="lr", prior="log-uniform"),
-        Integer(batch_min, batch_max, name="batch_size"),
-    ]
-    return xl, xu, sk_dims
-
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
-
-def make_preferred_bo_seeds(xl, xu):
-    """
-    Build small set of warm-seeds biased to small/moderate configs.
-    """
-    w_opts = sorted(set([clamp(20, xl[0], xu[0]), clamp(25, xl[0], xu[0]), clamp(30, xl[0], xu[0])]))
-    l_opts = sorted(set([clamp(1, xl[1], xu[1]),  clamp(2, xl[1], xu[1])]))
-    u_opts = sorted(set([clamp(32, xl[2], xu[2]), clamp(40, xl[2], xu[2]), clamp(48, xl[2], xu[2])]))
-    b_opts = sorted(set([clamp(32, xl[4], xu[4]), clamp(48, xl[4], xu[4]), clamp(64, xl[4], xu[4])]))
-    lr0   = clamp(1e-3, xl[3], xu[3])
-
-    seeds = []
-    for w, l, u, b in product(w_opts, l_opts, u_opts, b_opts):
-        seeds.append([int(w), int(l), int(u), float(lr0), int(b)])
-        if len(seeds) >= 12:  # keep compact
-            break
-    return seeds
-
-# ---------- Constrained wrapper for GA ----------
-class Tier1ConstrainedProblem(ElementwiseProblem):
-    """
-    Wrap Tier1LSTMProblem and apply a mild multiplicative penalty when
-    units exceed soft cap: units > min(4*n_features, 2*window).
-    """
-    def __init__(self, base_problem: Tier1LSTMProblem, xl: np.ndarray, xu: np.ndarray, n_features: int):
-        super().__init__(n_var=5, n_obj=1, xl=xl.copy(), xu=xu.copy())
-        self.base = base_problem
-        self.n_features = int(n_features)
-
-    def _evaluate(self, x, out, *_, **__):
-        tmp = {}
-        self.base._evaluate(x, tmp)
-        rmse = float(tmp["F"][0])
-
-        window = int(round(float(x[0])))
-        units  = int(round(float(x[2])))
-
-        soft_cap = int(min(4 * self.n_features, 2 * window))
-        overflow = max(0, units - soft_cap)
-        mult = 1.0 + 0.25 * (overflow / max(1, soft_cap))  # gentle
-        out["F"] = [rmse * mult]
-
 # ----------------- Main -----------------
 def main():
-    parser = argparse.ArgumentParser("Tier-1 LSTM Tuning (dynamic bounds + soft constraints, no GA/BO history)")
-    parser.add_argument('--folds-path', required=True,
-                        help='JSON list of folds, each with train/val CSV paths.')
-    parser.add_argument('--feature-path', default='data/processed_folds/lstm_feature_columns.json',
-                        help='Optional JSON list of feature names.')
-    parser.add_argument('--output-json', default='data/tuning_results/jsons/tier1_lstm.json')
-    parser.add_argument('--output-csv',  default='data/tuning_results/csv/tier1_lstm.csv')
-    parser.add_argument('--max-folds', type=int, default=None)
-    parser.add_argument('--seed', type=int, default=42)
+    ap = argparse.ArgumentParser("Tier-1 LSTM BACKBONE (GA→BO): search layers, batch_size, dropout only")
+    ap.add_argument('--folds-path', required=True,
+                    help='JSON list of folds, each with train/val CSV paths.')
+    ap.add_argument('--feature-path', default='data/processed_folds/lstm_feature_columns.json',
+                    help='Optional JSON list of feature names.')
+    ap.add_argument('--output-json', default='data/tuning_results/jsons/tier1_lstm_backbone.json')
+    ap.add_argument('--output-csv',  default='data/tuning_results/csv/tier1_lstm_backbone.csv')
+    ap.add_argument('--max-folds', type=int, default=None)
+    ap.add_argument('--seed', type=int, default=42)
+
+    # Fixed neutral knobs used INSIDE the problem (Tier-1 only)
+    ap.add_argument('--window-t1', type=int, default=25)
+    ap.add_argument('--units-t1',  type=int, default=48)
+    ap.add_argument('--lr-t1',     type=float, default=1e-3)
 
     # Objective/training knobs
-    parser.add_argument('--t1-epochs', type=int, default=10, help='Epochs per RMSE evaluation.')
-    parser.add_argument('--t1-patience', type=int, default=3, help='EarlyStopping patience.')
+    ap.add_argument('--t1-epochs', type=int, default=10, help='Epochs per RMSE evaluation.')
+    ap.add_argument('--t1-patience', type=int, default=3, help='EarlyStopping patience.')
 
     # Search knobs
-    parser.add_argument('--ga-pop-size', type=int, default=25, help='GA population size.')
-    parser.add_argument('--ga-n-gen', type=int, default=20, help='GA generations.')
-    parser.add_argument('--bo-n-calls', type=int, default=40, help='skopt BO calls.')
-    parser.add_argument('--top-n-seeds', type=int, default=12, help='Top GA individuals to warm-start BO.')
-
-    args = parser.parse_args()
+    ap.add_argument('--ga-pop-size', type=int, default=20, help='GA population size.')
+    ap.add_argument('--ga-n-gen',    type=int, default=15, help='GA generations.')
+    ap.add_argument('--bo-n-calls',  type=int, default=40, help='skopt BO calls.')
+    ap.add_argument('--top-n-seeds', type=int, default=10, help='Top GA individuals to warm-start BO.')
+    args = ap.parse_args()
 
     ensure_dir(LOG_DIR)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_DIR / "tier1_lstm.log"),
-            logging.StreamHandler()
-        ],
+        handlers=[logging.FileHandler(LOG_DIR / "tier1_lstm_backbone.log"), logging.StreamHandler()],
     )
 
     set_all_seeds(args.seed)
     setup_tf_perf()
-    gpu = have_gpu()
 
     ensure_dir(Path(args.output_json).parent)
     ensure_dir(Path(args.output_csv).parent)
 
-    # ---- Load folds JSON ----
+    # ---- Load folds ----
     folds_path = Path(args.folds_path).resolve()
     folds_raw = load_json(folds_path)
     if not isinstance(folds_raw, list):
@@ -262,7 +169,51 @@ def main():
 
     logging.info("Total folds: %d | pending: %d", len(folds), len(pending))
 
-    for item in tqdm(pending, desc="Tier-1 LSTM"):
+    # ---- Search space (ONLY 3 vars) ----
+    bo_dims = [
+        Integer(1, 3,     name="layers"),
+        Integer(16, 128,  name="batch_size"),
+        Real(0.0, 0.5,    name="dropout"),
+    ]
+    space = Space(bo_dims)
+
+    # Helpers to sanitize BO seeds (use skopt's validator)
+    def sanitize_bo_seeds(x_list, y_list, logger=logging):
+        """
+        - Cast to correct python types (int/int/float)
+        - Clip to bounds
+        - Drop duplicates
+        - Validate with check_x_in_space
+        - Keep x/y aligned
+        """
+        clean_x, clean_y, seen = [], [], set()
+        bad = 0
+        for x, y in zip(x_list, y_list):
+            xx = []
+            for v, dim in zip(x, space.dimensions):
+                lo, hi = dim.low, dim.high
+                if isinstance(dim, Integer):
+                    vv = int(round(float(v)))
+                else:
+                    vv = float(v)
+                vv = min(max(vv, lo), hi)  # clip
+                xx.append(vv)
+            try:
+                check_x_in_space(xx, space)  # raises ValueError if out-of-bounds
+            except ValueError:
+                bad += 1
+                continue
+            key = tuple(xx)
+            if key in seen:
+                continue
+            seen.add(key)
+            clean_x.append(xx)
+            clean_y.append(float(y))
+        if bad and logger:
+            logger.debug(f"[BO seeds] dropped {bad} out-of-bounds warm-start points.")
+        return clean_x, clean_y
+
+    for item in tqdm(pending, desc="Tier-1 LSTM Backbone"):
         fid = int(item["fold_id"])
         ticker = item.get("ticker")
 
@@ -282,40 +233,30 @@ def main():
             logging.warning("Feature load failed (%s). Falling back to inference.", e)
             feature_cols = load_features(None, train_df)
 
-        n_features = len(feature_cols)
-        n_train = len(train_df)
-
-        # Base Tier-1 objective (RMSE)
-        base_problem = Tier1LSTMProblem(
+        # ---- Problem: uses FIXED (window_t1, units_t1, lr_t1) internally ----
+        problem = Tier1LSTMBackboneProblem(
             train_df=train_df,
             val_df=val_df,
             feature_cols=feature_cols,
-            t1_epochs=args.t1_epochs,
-            patience=args.t1_patience,
+            window_t1=int(args.window_t1),
+            units_t1=int(args.units_t1),
+            lr_t1=float(args.lr_t1),
+            t1_epochs=int(args.t1_epochs),
+            patience=int(args.t1_patience),
         )
 
-        # Dynamic bounds & BO dims
-        xl, xu, bo_dims = make_dynamic_bounds(n_features, n_train, gpu)
-
-        # Constrained wrapper for GA (penalty inside)
-        problem = Tier1ConstrainedProblem(base_problem, xl, xu, n_features)
-
-        # ---- GA (seed search) ----
-        algorithm = GA(
-            pop_size=args.ga_pop_size,
-            eliminate_duplicates=True,
-            save_history=True
-        )
+        # ---- GA (light) to get diverse warm seeds ----
+        ga = GA(pop_size=args.ga_pop_size, eliminate_duplicates=True, save_history=True)
         res_ga = pymoo_minimize(
             problem,
-            algorithm,
+            ga,
             ('n_gen', args.ga_n_gen),
             verbose=False,
             return_algorithm=True,
             seed=args.seed
         )
 
-        # Collect unique individuals to warm-start BO
+        # Collect unique GA individuals for BO warm-start
         individuals = []
         try:
             for h in res_ga.algorithm.history:
@@ -329,46 +270,50 @@ def main():
         seen = set()
         uniq = []
         for ind in individuals:
-            x = np.array(ind.X, dtype=float)
-            # keep within bounds (safety)
-            x = np.clip(x, xl, xu)
+            x = np.array(ind.X, dtype=float)  # [layers, batch_size, dropout]
             f = float(ind.F[0])
             key = tuple(np.round(x, 6).tolist())
             if key not in seen:
                 seen.add(key)
                 uniq.append((x, f))
-
         uniq.sort(key=lambda t: t[1])
         top_pairs = uniq[:args.top_n_seeds]
 
-        # Preferred BO seeds (bias small/moderate)
-        pref_seeds = make_preferred_bo_seeds(xl, xu)
+        # If GA found nothing, seed a couple of reasonable defaults
+        if not top_pairs:
+            top_pairs = [
+                (np.array([1, 32, 0.1], dtype=float), 0.0),
+                (np.array([2, 64, 0.2], dtype=float), 0.0),
+            ]
 
-        # Build x0/y0 for BO
-        x0 = [t[0].tolist() for t in top_pairs] + pref_seeds
-        # Evaluate base RMSE for the preferred seeds (no penalty for y0, BO handles x)
-        y0_extra = []
-        for s in pref_seeds:
+        x0_raw = [t[0].tolist() for t in top_pairs]
+        y0_raw = [t[1]           for t in top_pairs]
+
+        # Sanitize BO seeds
+        x0, y0 = sanitize_bo_seeds(x0_raw, y0_raw)
+
+        # Fallback: center of the box
+        if not x0:
+            center = [(d.low + d.high) / 2.0 for d in space.dimensions]
+            # cast center properly and evaluate to get y0
+            center_cast = []
+            for c, dim in zip(center, space.dimensions):
+                center_cast.append(int(round(c)) if isinstance(dim, Integer) else float(c))
+            try:
+                check_x_in_space(center_cast, space)
+            except ValueError:
+                # last resort: use strict mids inside bounds
+                center_cast = [dim.low if isinstance(dim, Integer) else float(dim.low) for dim in space.dimensions]
             tmp = {}
-            base_problem._evaluate(s, tmp)      # true RMSE on validation
-            y0_extra.append(float(tmp["F"][0]))
-        y0 = [t[1] for t in top_pairs] + y0_extra
+            problem._evaluate(center_cast, tmp)
+            x0 = [center_cast]
+            y0 = [float(tmp["F"][0])]
 
-        # ---- BO (skopt) with soft-constraint penalty in objective ----
+        # ---- BO (skopt) on the same 3 vars ----
         def bo_objective(x):
-            """
-            Apply the same soft penalty here to bias BO away from oversized models.
-            """
             tmp = {}
-            base_problem._evaluate(x, tmp)
-            rmse = float(tmp["F"][0])
-
-            window = int(round(float(x[0])))
-            units  = int(round(float(x[2])))
-            soft_cap = int(min(4 * n_features, 2 * window))
-            overflow = max(0, units - soft_cap)
-            mult = 1.0 + 0.25 * (overflow / max(1, soft_cap))
-            return rmse * mult
+            problem._evaluate(x, tmp)
+            return float(tmp["F"][0])  # RMSE
 
         res_bo = gp_minimize(
             bo_objective,
@@ -378,56 +323,44 @@ def main():
             random_state=args.seed
         )
 
-        best = res_bo.x
+        best = res_bo.x  # [layers, batch_size, dropout]
         best_rmse = float(res_bo.fun)
-        logging.info(
-            "Fold %s (%s) | best: window=%d, layers=%d, units=%d, lr=%.6g, batch=%d | RMSE*=%.5f",
-            fid, (ticker or "n/a"), int(best[0]), int(best[1]), int(best[2]),
-            float(best[3]), int(best[4]), best_rmse
-        )
 
-        # Keep top GA individuals for reference (optional, compact)
-        top_ga = []
-        for x, f in top_pairs[:min(8, len(top_pairs))]:
-            d = {
-                "window":     int(round(x[0])),
-                "layers":     int(round(x[1])),
-                "units":      int(round(x[2])),
-                "lr":         float(x[3]),
-                "batch_size": int(round(x[4])),
-                "rmse_penalized": float(f),
-            }
-            top_ga.append(d)
+        logging.info(
+            "Fold %s (%s) | best: layers=%d, batch=%d, dropout=%.3f | RMSE=%.6f | (win_t1=%d, units_t1=%d, lr_t1=%.1e)",
+            fid, (ticker or "n/a"),
+            int(best[0]), int(best[1]), float(best[2]),
+            best_rmse, int(args.window_t1), int(args.units_t1), float(args.lr_t1)
+        )
 
         results.append({
             "fold_id": int(fid),
             "ticker":  ticker,
             "champion": {
-                "window":     int(best[0]),
-                "layers":     int(best[1]),
-                "units":      int(best[2]),
-                "lr":         float(best[3]),
-                "batch_size": int(best[4]),
+                "layers":     int(best[0]),
+                "batch_size": int(best[1]),
+                "dropout":    float(best[2]),
             },
-            "rmse_penalized": float(best_rmse),
+            "rmse": float(best_rmse),
             "features_used": feature_cols,
-            "bounds": {
-                "window": [int(xl[0]), int(xu[0])],
-                "layers": [int(xl[1]), int(xu[1])],
-                "units":  [int(xl[2]), int(xu[2])],
-                "lr":     [float(xl[3]), float(xu[3])],
-                "batch":  [int(xl[4]), int(xu[4])],
-                "gpu": bool(gpu),
-                "n_features": int(n_features),
-                "n_train": int(n_train),
+            "fixed_neutral": {
+                "window_t1": int(args.window_t1),
+                "units_t1":  int(args.units_t1),
+                "lr_t1":     float(args.lr_t1),
+                "epochs":    int(args.t1_epochs),
+                "patience":  int(args.t1_patience),
             },
-            "top_ga": top_ga,
+            "search_space": {
+                "layers": [1, 3],
+                "batch_size": [16, 128],
+                "dropout": [0.0, 0.5],
+            },
         })
 
         # checkpoint after each fold
         write_results(Path(args.output_json), Path(args.output_csv), results)
 
-    logging.info("=== Tier-1 LSTM complete. Saved to %s / %s ===", args.output_json, args.output_csv)
+    logging.info("=== Tier-1 LSTM BACKBONE complete. Saved to %s / %s ===", args.output_json, args.output_csv)
 
 if __name__ == "__main__":
     main()
