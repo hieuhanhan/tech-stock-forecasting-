@@ -18,7 +18,7 @@ LOCAL_CODE_DIR="${LOCAL_ROOT}"                      # repo root
 LOCAL_RESULTS_DIR="${LOCAL_ROOT}/_tuning_results"
 
 # --- EC2 ---
-EC2_HOST="ec2-54-93-233-72.eu-central-1.compute.amazonaws.com"      # TODO: change
+EC2_HOST="ec2-3-75-218-159.eu-central-1.compute.amazonaws.com"      # TODO: change
 EC2_KEY="/Users/duybui/Documents/Hieu-Han-Github/tech-stock-key.pem"        # TODO: change
 REMOTE_ROOT="/home/ec2-user/quant_runs"
 REMOTE_RUN_ID="$(date +%Y%m%d_%H%M%S)"
