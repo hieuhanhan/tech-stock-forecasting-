@@ -16,7 +16,7 @@ S3_LOGS_URI="${S3_BUCKET}/${S3_PREFIX}/logs"
 LOCAL_RESULTS_DIR="/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/_tuning_results"
 
 # --- EC2 ---
-EC2_HOST="ec2-3-75-218-159.eu-central-1.compute.amazonaws.com"       # <--- CHANGE
+EC2_HOST="ec2-18-195-8-71.eu-central-1.compute.amazonaws.com"       # <--- CHANGE
 EC2_KEY="/Users/duybui/Documents/Hieu-Han-Github/tech-stock-key.pem"    # <--- CHANGE (absolute path)
 REMOTE_REPO_DIR="/home/ec2-user/tech-stock-forecasting-"     # <--- repo path already cloned on EC2
 REMOTE_PYTHON="python3"
@@ -31,7 +31,7 @@ FEATURES_JSON="data/processed_folds/lstm_feature_columns.json"
 RETRAIN_INTERVALS="10,20,42"
 POP_SIZE=20
 NGEN=15
-BO_ITERS=3
+BO_ITERS=4
 
 TIER2_CSV="data/tuning_results/csv/tier2_lstm.csv"
 TIER2_JSON="data/tuning_results/jsons/tier2_lstm.json"
