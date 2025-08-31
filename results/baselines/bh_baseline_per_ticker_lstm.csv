@@ -1,0 +1,8 @@
+source,file,ticker,test_sharpe,test_mdd,test_ann_return,test_ann_vol,test_n_points
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,AAPL,1.7823891786883435,0.3424772024207554,0.7021346877552127,0.3939289444474255,253
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,AMZN,1.8518703736119795,0.24759848044717025,0.635453735232568,0.343141585009078,253
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,GOOGL,0.9767844495640385,0.33669741705716655,0.30287426469689566,0.31007277484001255,253
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,META,0.9068039588521669,0.38042296249135543,0.368620041298808,0.40650466696837934,253
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,MSFT,1.2252741249915344,0.28932266099115,0.3973699743364963,0.3243110796445177,253
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,NVDA,1.8799003671116827,0.40070978497205817,0.9212671636098636,0.49006169674051253,253
+BH_LSTM,data/processed_folds/final/lstm/test/lstm_test_scaled.csv,TSLA,2.902030552273764,0.610985347442126,2.452596458009401,0.8451311637941827,253

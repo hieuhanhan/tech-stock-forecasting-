@@ -221,23 +221,15 @@ def fit_pca_safely(X: np.ndarray, n_components_arg, max_pc: Optional[int] = None
     if isinstance(n_components_arg, float):
         if not (0.0 < n_components_arg < 1.0):
             raise ValueError("When float, --pca-n-components must be in (0,1).")
-        pca = PCA(n_components=n_components_arg, svd_solver="full", random_state=random_state)
-        pca.fit(X)
-        k = int(pca.n_components_)
+        pca_tmp = PCA(n_components=n_components_arg, svd_solver="full", random_state=random_state).fit(X)
+        k = int(pca_tmp.n_components_)
         if max_pc is not None and k > max_pc:
-            k = max_pc
-            pca.components_ = pca.components_[:k]
-            if hasattr(pca, "explained_variance_"):
-                pca.explained_variance_ = pca.explained_variance_[:k]
-            if hasattr(pca, "explained_variance_ratio_"):
-                pca.explained_variance_ratio_ = pca.explained_variance_ratio_[:k]
-        return pca
+            return PCA(n_components=max_pc, svd_solver="full", random_state=random_state).fit(X)
+        return pca_tmp
     else:
         k = int(n_components_arg)
         k = max(1, min(k, n_samples, n_features, max_pc if max_pc else k))
-        pca = PCA(n_components=k, svd_solver="randomized", random_state=random_state)
-        pca.fit(X)
-        return pca
+        return PCA(n_components=k, svd_solver="randomized", random_state=random_state).fit(X)
 
 def ensure_dirs(model_type: str):
     out_root = os.path.join(FINAL_OUT_ROOT, model_type.lower())
@@ -289,7 +281,6 @@ def transform_and_save_fold(fd: Dict,
                 Xout = pca.transform(Xs)
                 out_cols = [f"PC{i+1}" for i in range(Xout.shape[1])]
             out_cols = make_unique_feature_names(out_cols, set(out_df.columns))
-
             feat_df = pd.DataFrame(Xout, columns=out_cols)
             out_df = pd.concat([out_df, feat_df], axis=1)
 
@@ -363,8 +354,15 @@ def main():
     ap.add_argument("--minmax-cols", default="", help="Comma-separated cols for MinMax (hybrid mode)")
     ap.add_argument("--pca-n-components", default="0.95", help="float (0,1) variance target or int")
     ap.add_argument("--pca-max-pc", type=int, default=64)
-    ap.add_argument("--skip-pca-for-arima", action="store_true", default=True,
-                    help="If ARIMA and num_features<=1, skip PCA (scale only).")
+
+    # === PATCH #1: mutually exclusive flags for skipping PCA on ARIMA ===
+    grp = ap.add_mutually_exclusive_group()
+    grp.add_argument("--skip-pca-for-arima", dest="skip_pca_for_arima", action="store_true",
+                     help="Skip PCA for ARIMA if number of features <= 1 (default).")
+    grp.add_argument("--no-skip-pca-for-arima", dest="skip_pca_for_arima", action="store_false",
+                     help="Force PCA for ARIMA even if number of features <= 1.")
+    ap.set_defaults(skip_pca_for_arima=True)
+
     ap.add_argument("--models-tag", default="")
     ap.add_argument("--assume-inputs-clean", action="store_true",
                     help="(reserved) if inputs are already checked.")

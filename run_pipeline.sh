@@ -13,7 +13,9 @@ S3_RESULTS_URI="${S3_BUCKET}/${S3_PREFIX}/results"
 S3_LOGS_URI="${S3_BUCKET}/${S3_PREFIX}/logs"
 
 # --- LOCAL (MAC) ---
-LOCAL_RESULTS_DIR="/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting/_tuning_results"
+LOCAL_ROOT="/Users/duybui/Documents/Hieu-Han-Github/Personal-Project-/tech-stock-forecasting"
+LOCAL_CODE_DIR="${LOCAL_ROOT}"
+LOCAL_RESULTS_DIR="${LOCAL_ROOT}/_tuning_results"
 
 # --- EC2 ---
 EC2_HOST="ec2-18-195-8-71.eu-central-1.compute.amazonaws.com"       # <--- CHANGE

@@ -1,0 +1,2 @@
+source,file,fold_id,test_sharpe,test_mdd,test_ann_return,test_ann_vol,test_n_points,ticker
+BH_ARIMA,data/processed_folds/final/arima/test/arima_test_scaled.csv,,1.6971957222142968,0.6109853474423873,0.8124406684240213,0.4786959204469633,1771,
