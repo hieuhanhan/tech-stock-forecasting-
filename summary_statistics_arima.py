@@ -1,4 +1,3 @@
-# === Batch CSV ➜ styled PNG tables (Times, deep-blue header, 300 dpi) ===
 from pathlib import Path
 import math, numpy as np, pandas as pd
 import matplotlib.pyplot as plt

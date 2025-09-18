@@ -1,17 +1,3 @@
-# mini_summary_mdd_vol_turnover.py
-#
-# Create a compact risk summary by retraining interval (and optional source),
-# including Maximum Drawdown (MDD), annualized volatility, and turnover.
-# Exports: CSV summary + styled PNG table + two bar charts (MDD, Vol).
-# (Optionally a third chart for Turnover if --plot-turnover is passed.)
-#
-# Example:
-#   python mini_summary_mdd_vol_turnover.py \
-#       --csv data/results/backtest_arima.csv \
-#       --mode arima \
-#       --outdir results/chap5/risk_summaries \
-#       --split-by-source --plot-turnover
-
 import argparse
 from pathlib import Path
 import math

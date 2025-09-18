@@ -1,10 +1,3 @@
-# lstm_utils_new.py
-# ==========================================
-# Utilities for 2-tier LSTM pipeline (NEW STRATEGY)
-# Tier-1: backbone only (layers, batch_size, dropout) via RMSE
-# Tier-2: trading/time-scale knobs (window, units, lr, epochs, rel_thresh) via (-Sharpe, MDD)
-# ==========================================
-
 from __future__ import annotations
 import os
 import gc
@@ -42,7 +35,6 @@ TRADING_DAYS = 252
 EPS = 1e-8
 
 # Tier-1 fixed (neutral) knobs used *only* during Tier-1 objective
-# (You can override these in Tier-1 script via constructor args)
 WINDOW_T1_DEFAULT = 25   # ~1 trading month
 UNITS_T1_DEFAULT  = 48
 LR_T1_DEFAULT     = 1e-3
@@ -51,7 +43,6 @@ LR_T1_DEFAULT     = 1e-3
 T2_XL = np.array([10, 32, 1e-4, 10, 0.05], dtype=float)
 T2_XU = np.array([40, 96, 1e-2,  80, 0.95], dtype=float)
 
-# Columns you normally exclude from the feature set
 NON_FEATURE_KEEP = ["Date", "Ticker", "target", "target_log_returns", "Log_Returns", "Close_raw"]
 
 # ==================== Reproducibility & TF setup ====================

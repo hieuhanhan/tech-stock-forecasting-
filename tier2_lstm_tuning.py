@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""
-Tier-2 LSTM (NSGA-II + optional BO/ParEGO)
-- Multi-objective: maximize Sharpe, minimize MDD (optimize [-Sharpe, MDD])
-- Seeds (neutral lattice) -> NSGA-II exploration -> Optional BO/ParEGO refinement
-- HV progression per generation (GA) + final GA vs GA+BO hypervolume
-- Solution A autogenerates targets: target = target_log_returns = Log_Returns.shift(-1)
-- Logs include turnover/penalty pulled from objective.stats_map for dissertation
-
-Outputs (append-only):
-  CSVs -> data/tuning_results/csv/
-    - tier2_lstm.csv               (knee summary per fold × interval)
-    - tier2_lstm_front.csv         (Pareto fronts: GA & GA+BO)
-    - tier2_lstm_knee.csv          (knee picks from GA∪BO)
-    - tier2_lstm_hv.csv            (HV per GA generation + final GA vs GA∪BO)
-  JSON -> data/tuning_results/jsons/
-    - tier2_lstm.json              (append list of knee rows; checkpoint-style)
-"""
-
 import os
 import json
 import argparse

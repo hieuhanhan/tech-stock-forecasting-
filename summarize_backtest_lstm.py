@@ -1,23 +1,3 @@
-#!/usr/bin/env python3
-"""
-summarize_backtest_lstm.py
-
-Create a summary table for LSTM backtests, similar to Table 5.11 (ARIMA):
-- Columns: Sharpe mean/median, MDD mean/median, AnnRet mean/median, AnnVol mean/median, n
-- Rows   : grouped by `source` (e.g., GA_knee, GA+BO_knee)
-Optional filters:
-- --intervals 10,20,42       (only include these retraining intervals)
-- --sources GA_knee,GA+BO_knee (only include these sources)
-
-Usage:
-python summarize_backtest_lstm.py \
-  --csv data/backtest_lstm/backtest_lstm_results.csv \
-  --out-prefix data/backtest_lstm/summary_lstm \
-  --intervals 10,20,42 \
-  --sources GA_knee,GA+BO_knee \
-  --round 3
-"""
-
 import argparse
 from pathlib import Path
 import pandas as pd

@@ -1,4 +1,3 @@
-# pareto_best_vs_knee_all_folds.py
 import os
 import math
 import pandas as pd
@@ -9,18 +8,16 @@ from pathlib import Path
 # =============================
 # CONFIG
 # =============================
-ARIMA_CSV = "data/tuning_results/csv/tier2_arima_front.csv"  # change if your filename differs
-LSTM_CSV  = "data/tuning_results/csv/tier2_lstm_front.csv"   # change if your filename differs
+ARIMA_CSV = "data/tuning_results/csv/tier2_arima_front.csv"  
+LSTM_CSV  = "data/tuning_results/csv/tier2_lstm_front.csv"  
 
 OUT_DIR_ARIMA = "figures/pareto_best_vs_knee/arima"
 OUT_DIR_LSTM  = "figures/pareto_best_vs_knee/lstm"
 
-# If your file uses `interval` instead of `retrain_interval`, the code will adapt automatically.
-# Set which models to render:
+
 RENDER_ARIMA = True
 RENDER_LSTM  = True
 
-# Optional: limit to specific intervals (leave None to draw all found)
 LIMIT_INTERVALS = None  # e.g., [10, 20, 42]
 
 # =============================

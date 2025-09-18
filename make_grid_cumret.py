@@ -1,6 +1,3 @@
-# make_grid_cumret_3x2_pdf.py
-# Python 3.8+ ; pip install pillow
-
 from pathlib import Path
 from PIL import Image
 import re, argparse, sys
@@ -15,10 +12,6 @@ def parse_fold_interval(name: str):
     return int(m.group(1)), int(m.group(2))   # (fold, interval)
 
 def collect_images(base_dir: Path, img_name: str):
-    """
-    Quét cumret_outputs/<model>/fold_{id}_{interval}/{img_name}
-    Trả về list Path đã sắp theo (fold, interval).
-    """
     if not base_dir.exists():
         print(f"[WARN] Not found: {base_dir}", file=sys.stderr)
         return []
@@ -47,9 +40,6 @@ def paste_centered(canvas: Image.Image, img_path: Path, x, y, w, h):
 
 def build_pdf(images, out_pdf: Path, cols=2, rows=3,
               cell_w=720, cell_h=440, pad=28, bg="white"):
-    """
-    Ghép ảnh thành nhiều trang PDF; mỗi trang rows×cols.
-    """
     if not images:
         print(f"[WARN] No images -> skip {out_pdf.name}")
         return

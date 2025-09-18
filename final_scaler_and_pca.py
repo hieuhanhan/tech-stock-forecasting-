@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# final_scaler_and_pca.py
 import os
 import json
 import argparse

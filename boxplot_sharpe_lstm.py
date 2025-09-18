@@ -1,10 +1,3 @@
-# Boxplots of realized (backtest) Sharpe Ratios — ARIMA
-# - Input: backtest CSV produced by your ARIMA backtest script
-#   (columns include: fold_id, retrain_interval, source, test_sharpe, ...)
-# - Outputs:
-#   1) Fig_5_4a_arima_sharpe_by_interval.png  (per-interval GA vs GA+BO)
-#   2) Fig_5_4b_arima_sharpe_overall.png      (overall GA vs GA+BO)
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

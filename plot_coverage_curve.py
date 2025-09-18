@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# Plot coverage gain curves from select_representatives.py output
-# Usage:
-#   python plot_coverage_curve.py --result-json data/processed_folds/lstm_meta/selected_lstm.json \
-#                                 --title "LSTM fold selection (adaptive-k)" \
-#                                 --out-png figures/coverage_curve_lstm.png --out-pdf figures/coverage_curve_lstm.pdf \
-#                                 --show-gain
 import os, json, argparse
 import matplotlib.pyplot as plt
 

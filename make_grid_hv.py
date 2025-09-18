@@ -1,5 +1,3 @@
-# make_hv_grids_no_labels.py
-# Python 3.8+ ; pip install pillow
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import re, math, argparse, sys
@@ -20,13 +18,10 @@ def paste_centered(canvas: Image.Image, img_path: Path, box):
     canvas.paste(im, (ox, oy))
 
 def parse_fold_num(name: str):
-    m = re.search(r"hv_fold_?(\d+)$", name)   # hv_fold3 hoặc hv_fold_3
+    m = re.search(r"hv_fold_?(\d+)$", name)  
     return int(m.group(1)) if m else None
 
 def collect_images(base_dir: Path):
-    """
-    Trả về: { fold_num: { '10': Path, '20': Path, '42': Path }, ... }
-    """
     mapping = {}
     if not base_dir.exists():
         print(f"[ERROR] Not found: {base_dir}", file=sys.stderr)
@@ -55,10 +50,6 @@ def render_grids_no_labels(model_name: str,
                            cell_w=720, cell_h=440,
                            padding=28,
                            max_rows_per_image=10):
-    """
-    Tạo các ảnh grid KHÔNG vẽ tiêu đề/nhãn. Mỗi ảnh có 3 cột (10/20/42),
-    số hàng = số fold (giới hạn bởi max_rows_per_image).
-    """
     if not data_map:
         print(f"[WARN] No data for {model_name}. Skipped.")
         return
@@ -102,13 +93,12 @@ def render_grids_no_labels(model_name: str,
 def main():
     ap = argparse.ArgumentParser(description="Make HV grids (no labels) for ARIMA–GARCH & LSTM.")
     ap.add_argument("--arima_dir", default="data/figures/tier2_arima/hv_arima")
-    ap.add_argument("--lstm_dir",  default="data/figures/tier2_lstm/hv_lstm")
-    ap.add_argument("--out_dir",   default="figures/grids_hv_nolabels")
-    ap.add_argument("--cell_w",    type=int, default=720)
-    ap.add_argument("--cell_h",    type=int, default=440)
-    ap.add_argument("--padding",   type=int, default=28)
-    ap.add_argument("--max-rows",  type=int, default=9999,
-                    help="Số fold tối đa/ảnh (mặc định gom tất cả vào 1 ảnh).")
+    ap.add_argument("--lstm_dir", default="data/figures/tier2_lstm/hv_lstm")
+    ap.add_argument("--out_dir", default="figures/grids_hv_nolabels")
+    ap.add_argument("--cell_w", type=int, default=720)
+    ap.add_argument("--cell_h", type=int, default=440)
+    ap.add_argument("--padding", type=int, default=28)
+    ap.add_argument("--max-rows", type=int, default=9999)
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)

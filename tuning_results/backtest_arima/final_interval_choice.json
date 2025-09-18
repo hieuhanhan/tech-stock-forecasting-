@@ -1,0 +1,29 @@
+{
+  "best_interval": 20,
+  "diagnostics": {
+    "hv_summary": [
+      {
+        "retrain_interval": 20,
+        "median": 7.133713430043653e-08,
+        "std": 3.208731462694319e-05,
+        "count": 11,
+        "score": 0.0022231499263765564
+      },
+      {
+        "retrain_interval": 10,
+        "median": 0.0,
+        "std": 9.671584620999773e-05,
+        "count": 11,
+        "score": 0.0
+      },
+      {
+        "retrain_interval": 42,
+        "median": 0.0,
+        "std": 2.1249718724332558e-05,
+        "count": 11,
+        "score": 0.0
+      }
+    ],
+    "rule_used": "hv_gain_stability"
+  }
+}

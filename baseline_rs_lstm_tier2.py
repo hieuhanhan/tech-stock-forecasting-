@@ -1,21 +1,3 @@
-#!/usr/bin/env python3
-"""
-baseline_rs_lstm_tier2.py
-Random-Search baseline for LSTM Tier-2 (multi-objective: minimize [-Sharpe, MDD])
-
-- Auto-derives `target` and `target_log_returns` from `Log_Returns` if missing
-- Detects PCA columns as PC1..PC7 (only those present)
-
-Usage (example):
-python baseline_rs_lstm_tier2.py \
-  --folds-json data/processed_folds/final/lstm/lstm_tuning_folds_final_paths.json \
-  --tier1-json data/tuning_results/jsons/tier1_lstm_backbone.json \
-  --intervals 10,20,42 \
-  --n-samples 120 \
-  --skip-existing \
-  --out-prefix results/baselines/rs_lstm
-"""
-
 import os, json, argparse, logging
 from pathlib import Path
 from typing import Dict, List, Any, Tuple

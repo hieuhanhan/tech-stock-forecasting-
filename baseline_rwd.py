@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse, json
 from pathlib import Path
 import numpy as np
@@ -17,7 +16,6 @@ def unwrap_folds(obj):
     return obj
 
 def pick_train_val_paths(rec: dict, mode: str) -> tuple[str|None, str|None]:
-    # prefer keys that include the mode token; fallback to generic
     train_keys = [k for k in rec if "train_path" in k]
     val_keys   = [k for k in rec if "val_path"   in k and "meta" not in k]
     def pref(keys):
@@ -33,10 +31,10 @@ def rwd_rmse(train_series: np.ndarray, val_series: np.ndarray) -> float:
 
 def try_resolve(path_like: str|Path, search_roots: list[Path]) -> Path|None:
     p = Path(path_like)
-    # if already absolute and exists
+
     if p.is_absolute() and p.exists():
         return p
-    # try each root
+
     for root in search_roots:
         cand = (root / p)
         if cand.exists():
@@ -46,13 +44,13 @@ def try_resolve(path_like: str|Path, search_roots: list[Path]) -> Path|None:
 # ---------- main ----------
 def main():
     ap = argparse.ArgumentParser("RWD RMSE baseline from final folds JSON (robust path resolution)")
-    ap.add_argument("--t1-csv",     required=True, help="Tier-1 results CSV (must have 'fold_id').")
+    ap.add_argument("--t1-csv", required=True, help="Tier-1 results CSV (must have 'fold_id').")
     ap.add_argument("--folds-json", required=True, help="Final folds JSON with train/val paths.")
-    ap.add_argument("--mode",       required=True, choices=["arima","lstm"],
+    ap.add_argument("--mode", required=True, choices=["arima","lstm"],
                     help="arima → default column Log_Returns; lstm → default column target.")
-    ap.add_argument("--col",        default="", help="Override column name if needed.")
-    ap.add_argument("--out-csv",    required=True, help="Output CSV with 'rmse_rwd'.")
-    ap.add_argument("--debug",      action="store_true", help="Verbose logging.")
+    ap.add_argument("--col", default="", help="Override column name if needed.")
+    ap.add_argument("--out-csv", required=True, help="Output CSV with 'rmse_rwd'.")
+    ap.add_argument("--debug", action="store_true", help="Verbose logging.")
     args = ap.parse_args()
 
     default_col = "Log_Returns" if args.mode == "arima" else "target"
@@ -75,13 +73,13 @@ def main():
     # build a robust set of search roots:
     json_path   = Path(args.folds_json).resolve()
     roots = [
-        json_path.parent,                      # folder that holds the JSON
-        json_path.parent.parent,               # one up
-        json_path.parent.parent.parent,        # two up
-        Path.cwd(),                            # current working directory
-        Path.cwd().parent                      # project root (common)
+        json_path.parent,                    
+        json_path.parent.parent,              
+        json_path.parent.parent.parent,       
+        Path.cwd(),                          
+        Path.cwd().parent                    
     ]
-    # Also: if any root contains a 'data' folder, prefer that exact anchor
+
     roots = list(dict.fromkeys([r for r in roots if r is not None]))
 
     rmse_list, ok, miss = [], 0, 0
@@ -118,7 +116,6 @@ def main():
             va = pd.read_csv(va_path)
             use_col = col
             if use_col not in tr.columns or use_col not in va.columns:
-                # gentle fallbacks
                 if args.mode == "arima" and "Log_Returns" in tr.columns and "Log_Returns" in va.columns:
                     use_col = "Log_Returns"
                 elif args.mode == "lstm" and "target" in tr.columns and "target" in va.columns:

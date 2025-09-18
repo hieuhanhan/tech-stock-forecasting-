@@ -1,4 +1,3 @@
-# make_grids_pareto_best_vs_knee_grid3x3.py
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 import re, math
@@ -47,12 +46,12 @@ def make_pdf(model_name: str, pngs, out_prefix: str):
         canvas = Image.new("RGB", (W, H), "white")
         draw = ImageDraw.Draw(canvas)
 
-        # Title trên cùng
+
         draw.text((PADDING, PADDING),
                   TITLE_TEXT.format(model=model_name),
                   fill="black", font=title_font)
 
-        # Vẽ grid ảnh
+
         for i, png in enumerate(batch):
             r, c = divmod(i, COLS)
             x = PADDING + c*(CELL_W + PADDING)
@@ -72,7 +71,7 @@ def make_pdf(model_name: str, pngs, out_prefix: str):
 
         pages.append(canvas)
 
-    # Xuất PDF (multi-page)
+
     if pages:
         pdf_path = OUT_DIR / f"{out_prefix}.pdf"
         pages[0].save(pdf_path, save_all=True, append_images=pages[1:], resolution=150)

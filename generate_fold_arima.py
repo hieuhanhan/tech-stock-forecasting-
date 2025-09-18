@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
 import os
 import json
 import pandas as pd
 import numpy as np
-
 
 # CONFIG
 BASE_DIR = 'data'
@@ -133,10 +131,10 @@ if __name__ == "__main__":
     parser.add_argument("--input_csv", type=str, default=os.path.join("data", "scaled", "global", "train_val_scaled.csv"),
         help="Path to the scaled train+val CSV",)
     parser.add_argument("--train_window", type=int, default=252, help="Train window size")
-    parser.add_argument("--val_window",   type=int, default=42, help="Validation window size")
-    parser.add_argument("--step_size",    type=int, default=21, help="Sliding step size")
-    parser.add_argument("--date_col",     type=str, default="Date", help="Date column name")
-    parser.add_argument("--ticker_col",   type=str, default="Ticker", help="Ticker column name")
+    parser.add_argument("--val_window", type=int, default=42, help="Validation window size")
+    parser.add_argument("--step_size", type=int, default=21, help="Sliding step size")
+    parser.add_argument("--date_col", type=str, default="Date", help="Date column name")
+    parser.add_argument("--ticker_col", type=str, default="Ticker", help="Ticker column name")
 
     args = parser.parse_args()
 

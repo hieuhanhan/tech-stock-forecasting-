@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import os
 import json
 import argparse
@@ -51,7 +50,6 @@ def _enrich_selected_with_dates(meta_rows: List[dict],
         if dm and dx:
             return str(dm), str(dx)
 
-        # Fallback: đọc từ CSV trong summary nếu có
         def _try_csv(rel_path: Optional[str]) -> Optional[Tuple[str, str]]:
             if not rel_path:
                 return None
@@ -305,15 +303,12 @@ def main():
         _save_json(result, args.out_report_json)
         print(f"[INFO] Saved diagnostics -> {args.out_report_json}")
 
-    # ✨ NEW: emit tuning_folds_{model}.json (full records from folds_summary)
     tuning_default = (os.path.join(FINAL_DIR_LSTM, "lstm_tuning_folds.json")
                       if is_lstm else os.path.join(FINAL_DIR_ARIMA, "arima_tuning_folds.json"))
     tuning_out_path = args.tuning_out_path or tuning_default
 
     tuning_folds = _build_tuning_folds(result["selected_folds"], args.folds_summary_path)
     payload = tuning_folds
-    # Nếu muốn bọc theo key, bật 1 trong 2 dòng sau:
-    # payload = { "lstm": tuning_folds } if is_lstm else { "arima": tuning_folds }
 
     _save_json(payload, tuning_out_path)
     print(f"[INFO] Saved tuning folds -> {tuning_out_path} | rows={len(tuning_folds)}")

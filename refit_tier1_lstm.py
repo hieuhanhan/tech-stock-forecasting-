@@ -1,24 +1,3 @@
-#!/usr/bin/env python3
-"""
-Refit Tier-1 backbone for a single fold to log:
-- Effective epochs (before early stopping)
-- Best validation RMSE
-
-Usage examples:
-  python refit_tier1_fold.py \
-    --manifest data/processed_folds/final/lstm/lstm_folds_final_paths.json \
-    --base-dir data/processed_folds \
-    --fold-id 347 \
-    --champ-json data/tuning_results/jsons/tier1_lstm_backbone_results.json
-
-  # Hoặc tự truyền hyperparams nếu không có champ-json:
-  python refit_tier1_fold.py \
-    --manifest data/.../lstm_folds_final_paths.json \
-    --base-dir data/processed_folds \
-    --fold-id 347 \
-    --layers 2 --batch-size 64 --dropout 0.3
-"""
-
 import os
 import json
 import argparse
@@ -41,7 +20,7 @@ LR_T1     = 1e-3
 MAX_EPOCHS = 10
 PATIENCE   = 3
 
-# Các cột KHÔNG dùng làm feature (giống pipeline)
+
 NON_FEATURE_KEEP = ["Date", "Ticker", "target", "target_log_returns", "Log_Returns", "Close_raw"]
 
 # ==================== Helpers ====================
@@ -115,7 +94,7 @@ def refit_fold(train_df: pd.DataFrame,
     dropout = float(champ["dropout"])
     normtype = "layer" if bsize <= 32 else "batch"
 
-    # Clear TF graph/session để sạch bộ nhớ giữa các lần refit
+    # Clear TF graph/session 
     K.clear_session()
     model = build_lstm(WINDOW_T1, UNITS_T1, LR_T1, Xtr.shape[1], layers, dropout, norm_type=normtype)
     es = EarlyStopping(monitor="val_loss", patience=PATIENCE, restore_best_weights=True, verbose=0)
@@ -149,11 +128,11 @@ def get_champion_from_json(champ_json: str, fold_id: int) -> Optional[Dict[str, 
       - dict keyed theo fold_id
     """
     obj = load_json(champ_json)
-    # normalize thành list record
+
     if isinstance(obj, dict) and "results" in obj:
         obj = obj["results"]
     if isinstance(obj, dict):
-        # có thể là { "347": {...}, ... }
+
         obj = [v | {"fold_id": int(k)} for k, v in obj.items() if isinstance(v, dict)]
     for r in obj:
         try:
@@ -182,7 +161,6 @@ def main():
     args = ap.parse_args()
 
     manifest = load_json(args.manifest)
-    # Chuẩn hoá manifest thành dict {fold_id: record}
     if isinstance(manifest, dict) and "results" in manifest:
         manifest = manifest["results"]
     if isinstance(manifest, dict):
@@ -208,7 +186,7 @@ def main():
         raise SystemExit(f"Fold {args.fold_id} not found in manifest.")
 
     rec = idx[args.fold_id]
-    # Tên key phổ biến trong manifest; tuỳ bạn đổi cho khớp real manifest
+   
     train_key = rec.get("final_train_path") or rec.get("train_path") or rec.get("final_train_path")
     val_key   = rec.get("final_val_path")   or rec.get("val_path")
 
@@ -227,7 +205,6 @@ def main():
     train_df = pd.read_csv(train_csv)
     val_df   = pd.read_csv(val_csv)
 
-    # Kiểm tra có cột 'target'
     if "target" not in train_df.columns or "target" not in val_df.columns:
         raise SystemExit("Both train/val CSVs must contain a 'target' column (one-step-ahead log return).")
 
@@ -235,7 +212,6 @@ def main():
     if not feature_cols:
         raise SystemExit("No feature columns inferred. Check your CSV columns and NON_FEATURE_KEEP list.")
 
-    # Lấy champion hyperparams
     champ = None
     if args.champ_json:
         champ = get_champion_from_json(args.champ_json, args.fold_id)
@@ -253,7 +229,6 @@ def main():
 
     stats = refit_fold(train_df, val_df, feature_cols, champ, label=f"Fold {args.fold_id}")
 
-    # In kết quả gọn gàng (có thể copy vào Table)
     print("\n=== SUMMARY ===")
     print(f"Fold: {args.fold_id}")
     print(f"Layers / Batch / Dropout: {stats['layers']} / {stats['batch_size']} / {stats['dropout']}")

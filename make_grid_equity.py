@@ -1,6 +1,3 @@
-# make_grid_equity_3x2_pdf.py
-# Python 3.8+ ; Pillow required: pip install pillow
-
 from pathlib import Path
 from PIL import Image
 import re, math, argparse, sys
@@ -14,10 +11,6 @@ def parse_fold_interval(name: str):
     return int(m.group(1)), int(m.group(2))
 
 def collect_equity_images(base_dir: Path):
-    """
-    Quét các thư mục con dạng fold_{id}_{interval} và lấy file equity_curve.png
-    Trả về list[(sort_key, path)] để sắp xếp ổn định: theo fold, rồi interval (10,20,42).
-    """
     if not base_dir.exists():
         print(f"[WARN] Not found: {base_dir}", file=sys.stderr)
         return []
@@ -41,7 +34,6 @@ def paste_centered(canvas: Image.Image, img_path: Path, box):
     try:
         im = Image.open(img_path).convert("RGB")
     except Exception:
-        # ô rỗng khi thiếu ảnh
         return
     im.thumbnail((w, h), Image.LANCZOS)
     ox = x + (w - im.width)//2
@@ -49,9 +41,6 @@ def paste_centered(canvas: Image.Image, img_path: Path, box):
     canvas.paste(im, (ox, oy))
 
 def build_pdf(images, out_pdf: Path, cols=2, rows=3, cell_w=720, cell_h=440, padding=28, bg="white"):
-    """
-    Ghép images vào nhiều trang (mỗi trang rows×cols), không chữ, lưu 1 file PDF.
-    """
     if not images:
         print(f"[WARN] No images -> skip {out_pdf.name}")
         return
@@ -72,7 +61,6 @@ def build_pdf(images, out_pdf: Path, cols=2, rows=3, cell_w=720, cell_h=440, pad
             paste_centered(page, img_path, (x, y, cell_w, cell_h))
         pages.append(page)
 
-    # lưu PDF (chỉ PDF, không xuất PNG)
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
     pages[0].save(out_pdf, save_all=True, append_images=pages[1:])
     print(f"[OK] Saved PDF -> {out_pdf}")

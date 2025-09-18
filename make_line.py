@@ -4,14 +4,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ========= USER CONFIG =========
-CSV_PATH = "data/backtest_arima/backtest_arima_results.csv"   # đổi sang file LSTM khi cần
-OUT_DIR  = "data/figures/sensitivity_arima"                         # nơi lưu ảnh
-FILTER_SOURCE = None  # ví dụ: "GA+BO_knee" hoặc "LSTM_knee"; None = dùng tất cả
-AGG_FN = "mean"       # "mean" hoặc "median"
-POINT_SIZE_MIN, POINT_SIZE_MAX = 60, 260   # cỡ điểm cho Pareto scatter
+CSV_PATH = "data/backtest_arima/backtest_arima_results.csv"   
+OUT_DIR  = "data/figures/sensitivity_arima"                      
+FILTER_SOURCE = None  
+AGG_FN = "mean"     
+POINT_SIZE_MIN, POINT_SIZE_MAX = 60, 260   
 # =================================
 
-# Tên cột trong file CSV (giữ đồng nhất giữa ARIMA & LSTM)
+
 COL_FOLD      = "fold_id"
 COL_INTERVAL  = "retrain_interval"
 COL_SOURCE    = "source"
@@ -37,16 +37,11 @@ def load_data():
     )
     if FILTER_SOURCE and (COL_SOURCE in df.columns):
         df = df[df[COL_SOURCE] == FILTER_SOURCE].copy()
-    # bỏ hàng thiếu số liệu cốt lõi
+
     df = df.dropna(subset=[COL_INTERVAL, COL_THRESHOLD, COL_SHARPE, COL_MDD, COL_TURNOVER])
     return df
 
 def aggregate_by_threshold_interval(df):
-    """
-    Trả về 2 bảng: (agg, spread)
-      - agg: giá trị trung tâm (mean/median) cho mỗi (interval, threshold)
-      - spread: độ lệch chuẩn (std) cho vẽ dải sai số (line profile)
-    """
     gb = df.groupby([COL_INTERVAL, COL_THRESHOLD])
     if AGG_FN == "median":
         agg = gb[[COL_SHARPE, COL_MDD, COL_TURNOVER]].median().reset_index()
@@ -63,9 +58,6 @@ def aggregate_by_threshold_interval(df):
     return agg
 
 def plot_line_profiles(agg_df, metric, ylabel, out_path):
-    """
-    Line profile với dải sai số (±1 std) theo từng interval.
-    """
     fig, ax = plt.subplots(figsize=(8,6), dpi=140)
     std_col = f"{metric}_std"
     for interval, sub in agg_df.groupby(COL_INTERVAL):
@@ -74,7 +66,7 @@ def plot_line_profiles(agg_df, metric, ylabel, out_path):
         y = sub[metric].values
         s = sub[std_col].values
         ax.plot(x, y, marker="o", label=f"int={interval}")
-        # dải sai số (có thể có NaN nếu 1 fold; an toàn thì fillna(0))
+
         s = np.nan_to_num(s, nan=0.0)
         ax.fill_between(x, y - s, y + s, alpha=0.15)
     ax.set_xlabel("Threshold (multiplier)")
@@ -87,13 +79,9 @@ def plot_line_profiles(agg_df, metric, ylabel, out_path):
     plt.close(fig)
 
 def pareto_frontier(points, x_col, y_col, minimize_x=True, maximize_y=True):
-    """
-    Trả về chỉ số của các điểm thuộc Pareto frontier (không bị trội bởi điểm khác).
-    - Với trường hợp thường gặp: muốn MDD thấp (min x) và Sharpe cao (max y).
-    """
     data = points[[x_col, y_col]].values
     idx = np.arange(len(points))
-    # sắp xếp theo x (tăng) rồi y (giảm) để duyệt đơn giản
+
     order = np.lexsort(( -data[:,1] if maximize_y else data[:,1],
                          data[:,0] if minimize_x else -data[:,0]))
     data = data[order]
@@ -126,10 +114,10 @@ def plot_pareto_scatter(agg_df, out_path, annotate_best=True):
     """
     fig, ax = plt.subplots(figsize=(9,6.5), dpi=140)
 
-    # chuẩn hóa kích thước điểm theo turnover
+
     sizes = normalize_sizes(agg_df[COL_TURNOVER].values)
 
-    # vẽ theo interval để dễ phân biệt
+
     for interval, sub in agg_df.groupby(COL_INTERVAL):
         s_sizes = normalize_sizes(sub[COL_TURNOVER].values,
                                   vmin=agg_df[COL_TURNOVER].min(),
@@ -137,7 +125,6 @@ def plot_pareto_scatter(agg_df, out_path, annotate_best=True):
         ax.scatter(sub[COL_MDD], sub[COL_SHARPE], s=s_sizes, alpha=0.8, label=f"int={interval}")
 
         if annotate_best:
-            # đánh dấu best Sharpe & best MDD trong interval
             i_best_sharpe = sub[COL_SHARPE].idxmax()
             i_best_mdd    = sub[COL_MDD].idxmin()
             for i, tag in [(i_best_sharpe, "max Sharpe"), (i_best_mdd, "min MDD")]:
@@ -167,7 +154,7 @@ def main():
     df = load_data()
     agg = aggregate_by_threshold_interval(df)
 
-    # ===== Line profiles (với dải std) =====
+    # ===== Line profiles =====
     plot_line_profiles(agg, COL_SHARPE,   "Test Sharpe",   os.path.join(OUT_DIR, "lineprofile_sharpe.png"))
     plot_line_profiles(agg, COL_MDD,      "Test MDD",      os.path.join(OUT_DIR, "lineprofile_mdd.png"))
     plot_line_profiles(agg, COL_TURNOVER, "Test Turnover", os.path.join(OUT_DIR, "lineprofile_turnover.png"))

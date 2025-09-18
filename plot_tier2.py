@@ -1,7 +1,3 @@
-# plot_tier2.py
-# One script for Tier-2 GA vs GA+BO: works for ARIMA, LSTM, ...
-# Usage examples at bottom.
-
 from pathlib import Path
 import argparse
 import numpy as np

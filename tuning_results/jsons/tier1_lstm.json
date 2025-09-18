@@ -1,0 +1,564 @@
+[
+  {
+    "fold_id": 553,
+    "ticker": "NVDA",
+    "champion": {
+      "layers": 2,
+      "batch_size": 29,
+      "dropout": 0.2058048055794204
+    },
+    "rmse": 0.2334979921579361,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 564,
+    "ticker": "NVDA",
+    "champion": {
+      "layers": 2,
+      "batch_size": 21,
+      "dropout": 0.17998771774261663
+    },
+    "rmse": 0.4493553340435028,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 159,
+    "ticker": "AMZN",
+    "champion": {
+      "layers": 1,
+      "batch_size": 17,
+      "dropout": 0.19035368651231163
+    },
+    "rmse": 0.4701269865036011,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 347,
+    "ticker": "META",
+    "champion": {
+      "layers": 1,
+      "batch_size": 31,
+      "dropout": 0.1951981984579586
+    },
+    "rmse": 0.3897814452648163,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 206,
+    "ticker": "AMZN",
+    "champion": {
+      "layers": 1,
+      "batch_size": 23,
+      "dropout": 0.1732890275900272
+    },
+    "rmse": 0.4220804274082184,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 364,
+    "ticker": "META",
+    "champion": {
+      "layers": 1,
+      "batch_size": 22,
+      "dropout": 0.18935020407164796
+    },
+    "rmse": 0.4333992898464203,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 444,
+    "ticker": "MSFT",
+    "champion": {
+      "layers": 1,
+      "batch_size": 27,
+      "dropout": 0.18655426818523818
+    },
+    "rmse": 0.4053919017314911,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 400,
+    "ticker": "MSFT",
+    "champion": {
+      "layers": 1,
+      "batch_size": 31,
+      "dropout": 0.09171598062196497
+    },
+    "rmse": 0.4512499272823334,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 35,
+    "ticker": "AAPL",
+    "champion": {
+      "layers": 2,
+      "batch_size": 25,
+      "dropout": 0.06346522906873943
+    },
+    "rmse": 0.407536119222641,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 599,
+    "ticker": "TSLA",
+    "champion": {
+      "layers": 1,
+      "batch_size": 31,
+      "dropout": 0.044730386207862495
+    },
+    "rmse": 0.4711935222148895,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 652,
+    "ticker": "TSLA",
+    "champion": {
+      "layers": 2,
+      "batch_size": 21,
+      "dropout": 0.5
+    },
+    "rmse": 0.4144347608089447,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 246,
+    "ticker": "GOOGL",
+    "champion": {
+      "layers": 2,
+      "batch_size": 28,
+      "dropout": 0.2971061460667621
+    },
+    "rmse": 0.4704384207725525,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 216,
+    "ticker": "GOOGL",
+    "champion": {
+      "layers": 2,
+      "batch_size": 29,
+      "dropout": 0.5
+    },
+    "rmse": 0.4313168525695801,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7",
+      "PC8"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  },
+  {
+    "fold_id": 3,
+    "ticker": "AAPL",
+    "champion": {
+      "layers": 2,
+      "batch_size": 19,
+      "dropout": 0.04629511207892636
+    },
+    "rmse": 0.3601905107498169,
+    "features_used": [
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5",
+      "PC6",
+      "PC7",
+      "PC8"
+    ],
+    "fixed_neutral": {
+      "window_t1": 25,
+      "units_t1": 48,
+      "lr_t1": 0.001,
+      "epochs": 10,
+      "patience": 3
+    },
+    "search_space": {
+      "layers": [
+        1,
+        3
+      ],
+      "batch_size": [
+        16,
+        128
+      ],
+      "dropout": [
+        0.0,
+        0.5
+      ]
+    }
+  }
+]
