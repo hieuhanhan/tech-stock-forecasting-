@@ -1,0 +1,14 @@
+{
+  "fold_id": 35,
+  "interval": 10,
+  "source": "GA+BO_knee",
+  "params": {
+    "p": 4,
+    "q": 5,
+    "threshold": 0.0100646512835479
+  },
+  "daily_volatility": 0.030631696823505535,
+  "annualized_volatility": 0.48626311218553697,
+  "window": 63,
+  "periods_per_year": 252
+}

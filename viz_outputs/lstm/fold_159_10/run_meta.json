@@ -1,0 +1,16 @@
+{
+  "fold_id": 159,
+  "interval": 10,
+  "params": {
+    "window": 20,
+    "units": 40,
+    "lr": 0.001,
+    "epochs": 30,
+    "threshold": 0.499013451
+  },
+  "test_stats": {
+    "sharpe": 0.0020556487937367796,
+    "mdd": 0.24698283744145066,
+    "turnover": 90.0
+  }
+}

@@ -4,7 +4,8 @@ import json
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
+from tqdm import tqdm
 
 import numpy as np
 import pandas as pd
@@ -16,9 +17,9 @@ from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, BatchNormalizat
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 
-# -----------------------------
+# =========================
 # Defaults
-# -----------------------------
+# =========================
 BASE_COST = 0.0005
 SLIPPAGE  = 0.0002
 DEFAULT_MIN_BLOCK_VOL = 0.0015
@@ -28,14 +29,14 @@ PC_FEATURES = [f"PC{i}" for i in range(1, 8)]  # PC1..PC7
 TARGET_COL = "target"                          # used to build windows
 RETN_COL   = "target_log_returns"              # realized returns for PnL/MDD
 
-# -----------------------------
+# =========================
 # Logging / TF setup
-# -----------------------------
+# =========================
 def setup_logging(debug: bool):
     level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(level=level, format="%(asctime)s [%(levelname)s] %(message)s")
 
-def setup_tf(seed: int = 42):
+def setup_tf(seed: int = 42, use_mixed_precision: bool = True):
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
     tf.random.set_seed(seed)
     np.random.seed(seed)
@@ -43,14 +44,15 @@ def setup_tf(seed: int = 42):
         gpus = tf.config.list_physical_devices("GPU")
         for g in gpus:
             tf.config.experimental.set_memory_growth(g, True)
-        tf.keras.mixed_precision.set_global_policy("mixed_float16")
-        tf.config.optimizer.set_jit(True)  # XLA
+        if use_mixed_precision:
+            tf.keras.mixed_precision.set_global_policy("mixed_float16")
+            tf.config.optimizer.set_jit(True)  # XLA
     except Exception:
         pass
 
-# -----------------------------
+# =========================
 # Metrics
-# -----------------------------
+# =========================
 def sharpe_ratio(simple_returns: np.ndarray) -> float:
     r = np.asarray(simple_returns, dtype=float)
     if r.size < 2:
@@ -74,9 +76,9 @@ def max_drawdown(data: np.ndarray, input_type: str = "log") -> float:
     dd = (peak - C) / (peak + np.finfo(float).eps)
     return float(np.max(dd))
 
-# -----------------------------
+# =========================
 # Helpers
-# -----------------------------
+# =========================
 def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
@@ -117,7 +119,7 @@ def pick_knee_from_front(front_df: pd.DataFrame, fold_id: int, interval: int, fr
                    (front_df["front_type"] == front_type)]
     if sub.empty:
         return None
-    # Use their pre-computed knee if present; otherwise nearest to origin in normalized (−Sharpe, MDD)
+    # Use pre-computed knee if present; else nearest to origin in normalized (−Sharpe, MDD)
     if {"is_knee"}.issubset(sub.columns) and sub["is_knee"].any():
         row = sub[sub["is_knee"]].iloc[0]
     else:
@@ -139,20 +141,53 @@ def pick_knee_from_front(front_df: pd.DataFrame, fold_id: int, interval: int, fr
         mdd=float(row["mdd"])
     )
 
-# -----------------------------
-# LSTM backtest engine (block re-train, 0/1 signals)
-# -----------------------------
+def choose_final_interval(hv_df: Optional[pd.DataFrame],
+                          test_table: pd.DataFrame,
+                          intervals: List[int]) -> Tuple[int, Dict]:
+    """Prefer HV-gain stability if HV CSV provided; else median test Sharpe on GA+BO_knee."""
+    diag: Dict = {}
+    if hv_df is not None and not hv_df.empty:
+        piv = hv_df.pivot_table(index=["fold_id","retrain_interval"],
+                                columns="stage", values="hv", aggfunc="first").reset_index()
+        if {"final_ga","final_union"}.issubset(piv.columns):
+            piv["hv_gain"] = piv["final_union"] - piv["final_ga"]
+            by_int = piv.groupby("retrain_interval")["hv_gain"].agg(["median","std","count"]).reset_index()
+            by_int["score"] = by_int["median"] / (by_int["std"].replace(0, np.nan) + 1e-9)
+            by_int = by_int.sort_values(["score","median","count"], ascending=[False,False,False])
+            best_int = int(by_int.iloc[0]["retrain_interval"])
+            diag["hv_summary"] = by_int.to_dict("records")
+            diag["rule_used"] = "hv_gain_stability"
+            return best_int, diag
+    # Fallback: median test Sharpe – ưu tiên GA+BO
+    sub = test_table[test_table["source"] == "GA+BO_knee"]
+    if sub.empty:
+        sub = test_table
+    by_int = sub.groupby("retrain_interval")["test_sharpe"].median().reset_index()
+    by_int = by_int.sort_values(["test_sharpe"], ascending=False)
+    best_int = int(by_int.iloc[0]["retrain_interval"])
+    diag["sharpe_median_by_interval"] = by_int.to_dict("records")
+    diag["rule_used"] = "median_test_sharpe"
+    return best_int, diag
+
+# =========================
+# LSTM backtest (0/1 signals) + knobs to reduce turnover
+# =========================
 def backtest_lstm(
     test_df: pd.DataFrame,
     feature_cols: List[str],
-    champion: Dict,                 # from Tier-1: layers, batch_size, dropout
-    t2_vars: Dict,                  # from Tier-2 knee: window, units, lr, epochs, threshold
+    champion: Dict,                 # Tier-1: layers, batch_size, dropout
+    t2_vars: Dict,                  # Tier-2 knee: window, units, lr, epochs, threshold
     retrain_interval: int,
     cost_per_turnover: float = BASE_COST + SLIPPAGE,
     min_block_vol: float = DEFAULT_MIN_BLOCK_VOL,
     hysteresis: float = 0.05,
     mad_k: float = 0.5,
     warmup_len: int = 252,
+    # NEW knobs
+    min_holding_days: int = 0,
+    enter_k: int = 1,
+    exit_k: int = 1,
+    turnover_cap_per_year: float = 1e9,
     debug: bool = False,
 ) -> Dict:
 
@@ -169,20 +204,20 @@ def backtest_lstm(
     if n_total <= warmup_len + 1:
         raise ValueError(f"Test length {n_total} too small for warmup_len={warmup_len}")
 
-    # fixed hyperparams from T1 champion
+    # Tier-1 champion
     layers     = int(champion.get("layers", 1))
     batch_size = int(champion.get("batch_size", 32))
     dropout    = float(champion.get("dropout", 0.2))
     patience   = int(champion.get("patience", 5))
 
-    # vars from T2 knee
+    # Tier-2 knee vars
     window  = int(t2_vars["window"])
     units   = int(t2_vars["units"])
     lr      = float(t2_vars["lr"])
     epochs  = int(t2_vars["epochs"])
     q_rel   = float(t2_vars["threshold"])
 
-    # Walk-forward
+    # Walk-forward history
     hist_X = arr_feat[:warmup_len].copy()
     hist_y = arr_tgt[:warmup_len].copy()
 
@@ -191,9 +226,8 @@ def backtest_lstm(
     prev_sig_last = 0.0
     total_turnover = 0.0
 
-    # traces (optional)
-    sig_trace = []
-    turn_trace = []
+    # Global turnover cap (approx. annualized)
+    global_turnover_cap = float(turnover_cap_per_year) * (n_total / 252.0)
 
     for start in range(start_idx, n_total, int(retrain_interval)):
         end = min(start + int(retrain_interval), n_total)
@@ -219,7 +253,7 @@ def backtest_lstm(
             hist_y = np.concatenate([hist_y, block_tgt])
             continue
 
-        # windows for block with warm-start (tail of history)
+        # windows for validation on block (warm-start with tail)
         Xw_val, yw_val = create_windows(
             np.concatenate([hist_X[-window:], block_feat], axis=0),
             np.concatenate([hist_y[-window:], block_tgt], axis=0),
@@ -230,7 +264,7 @@ def backtest_lstm(
             hist_y = np.concatenate([hist_y, block_tgt])
             continue
 
-        # train & predict block
+        # fit & predict
         try:
             K.clear_session()
             norm_type = "layer" if batch_size <= 32 else "batch"
@@ -253,7 +287,7 @@ def backtest_lstm(
             hist_y = np.concatenate([hist_y, block_tgt])
             continue
 
-        # thresholding + hysteresis + MAD filter
+        # Thresholds, MAD filter & confirmation logic
         thr_enter = np.percentile(preds, q_rel * 100.0)
         thr_exit  = np.percentile(preds, max(0.0, (q_rel - hysteresis)) * 100.0)
         med = float(np.median(preds))
@@ -262,17 +296,48 @@ def backtest_lstm(
 
         sig = np.zeros_like(preds, dtype=float)
         state = int(prev_sig_last > 0.5)
+        held = 0
+        enter_streak = 0
+        exit_streak  = 0
+
         for t in range(preds.size):
-            if state == 0:
-                if (preds[t] >= thr_enter) and strong[t]:
-                    state = 1
+            # update streaks
+            if (preds[t] >= thr_enter) and strong[t]:
+                enter_streak += 1
             else:
-                if (preds[t] < thr_exit) or (not strong[t]):
+                enter_streak = 0
+
+            if (preds[t] < thr_exit) or (not strong[t]):
+                exit_streak += 1
+            else:
+                exit_streak = 0
+
+            if state == 0:
+                if enter_streak >= enter_k:
+                    state = 1
+                    enter_streak = 0
+                    held = 1
+                else:
+                    held = 0
+            else:
+                if (held >= min_holding_days) and (exit_streak >= exit_k):
                     state = 0
+                    exit_streak = 0
+                    held = 0
+                else:
+                    held += 1
+
             sig[t] = float(state)
 
+        # Turnover + global cap
         sig_full = np.concatenate([[prev_sig_last], sig])
         turnover = np.abs(np.diff(sig_full))
+        # enforce remaining budget (scale down if necessary)
+        cap_remaining = max(0.0, global_turnover_cap - total_turnover)
+        if turnover.sum() > cap_remaining:
+            scale = cap_remaining / (turnover.sum() + 1e-12)
+            scale = max(0.0, min(1.0, scale))
+            turnover = turnover * scale
         cost_vec = cost_per_turnover * turnover
         total_turnover += float(turnover.sum())
 
@@ -283,8 +348,6 @@ def backtest_lstm(
 
         simple_all.append(ret_simple)
         log_all.append(ret_log)
-        sig_trace.append(sig)
-        turn_trace.append(turnover)
 
         # extend history & carry state
         hist_X = np.vstack([hist_X, block_feat])
@@ -311,53 +374,61 @@ def backtest_lstm(
         n_points=int(net_simple.size)
     )
 
-# -----------------------------
-# CLI driver (read fronts → pick knees → backtest → checkpoint)
-# -----------------------------
+# =========================
+# CLI driver
+# =========================
 def main():
-    ap = argparse.ArgumentParser("Backtest Tier-2 LSTM (PC1..PC7)")
+    ap = argparse.ArgumentParser("Backtest Tier-2 LSTM (PC1..PC7) with turnover controls")
     ap.add_argument("--tier2-front-csv", required=True,
-                    help="Tier-2 fronts CSV for LSTM (must have window, units, learning_rate/lr, epochs, threshold, sharpe, mdd).")
+                    help="Tier-2 fronts CSV (must have window, units, learning_rate/lr, epochs, threshold, sharpe, mdd).")
     ap.add_argument("--tier1-json", required=True,
                     help="Tier-1 champions JSON (list or {'results': [...]}) with per-fold {layers,batch_size,dropout}.")
     ap.add_argument("--test-csv", required=True,
                     help="TEST CSV containing PC1..PC7, 'target', and 'target_log_returns' (or 'Log_Returns').")
     ap.add_argument("--intervals", default="10,20,42",
                     help="Comma-separated retrain intervals to evaluate.")
+    ap.add_argument("--hv-csv", default="", help="Optional HV CSV (final_ga/final_union) to aid final interval choice.")
     ap.add_argument("--outdir", default="data/backtest_lstm", help="Where to save results.")
     ap.add_argument("--cost-per-turnover", type=float, default=BASE_COST + SLIPPAGE)
     ap.add_argument("--min-block-vol", type=float, default=DEFAULT_MIN_BLOCK_VOL)
     ap.add_argument("--hysteresis", type=float, default=0.05)
     ap.add_argument("--mad-k", type=float, default=0.5)
     ap.add_argument("--warmup-len", type=int, default=252)
+    ap.add_argument("--min-holding-days", type=int, default=0,
+                    help="Minimum days to hold a position before allowing exit.")
+    ap.add_argument("--enter-k", type=int, default=1,
+                    help="Consecutive days meeting enter threshold to open a position.")
+    ap.add_argument("--exit-k", type=int, default=1,
+                    help="Consecutive days meeting exit condition to close a position.")
+    ap.add_argument("--turnover-cap-per-year", type=float, default=1e9,
+                    help="Cap on total turnover per 252 trading days.")
+    ap.add_argument("--no-mixed-precision", action="store_true",
+                    help="Disable mixed precision/XLA (useful on CPU-only environments).")
     ap.add_argument("--debug", action="store_true")
     args = ap.parse_args()
 
     setup_logging(args.debug)
-    setup_tf(seed=42)
+    setup_tf(seed=42, use_mixed_precision=not args.no_mixed_precision)
 
-    outdir = Path(args.outdir)
-    ensure_dir(outdir)
+    outdir = Path(args.outdir); ensure_dir(outdir)
     result_csv = outdir / "backtest_lstm_results.csv"
 
-    # --- Load Tier-2 fronts ---
+    # Load Tier-2 fronts
     fronts = pd.read_csv(args.tier2_front_csv)
     need_cols = {"fold_id","retrain_interval","front_type","window","units","sharpe","mdd"}
     if not need_cols.issubset(fronts.columns):
         missing = need_cols - set(fronts.columns)
         raise ValueError(f"Tier-2 fronts CSV missing columns: {missing}")
 
-    # --- Load Tier-1 champions ---
+    # Load Tier-1 champions
     with open(args.tier1_json, "r") as f:
         t1 = json.load(f)
     if isinstance(t1, dict) and "results" in t1:
         t1 = t1["results"]
-    # infer key names: champion dict might be under 'champion' or 'best_params'
     champ_map: Dict[int, Dict] = {}
     for rec in t1:
         fid = int(rec.get("fold_id"))
         ch  = rec.get("champion") or rec.get("best_params") or {}
-        # normalize field names
         champ_map[fid] = dict(
             layers=int(ch.get("layers", ch.get("num_layers", 1))),
             batch_size=int(ch.get("batch_size", 32)),
@@ -365,7 +436,7 @@ def main():
             patience=int(ch.get("patience", 5)),
         )
 
-    # --- Load TEST set ---
+    # Load TEST set
     test_df = pd.read_csv(args.test_csv)
     for c in PC_FEATURES + [TARGET_COL]:
         if c not in test_df.columns:
@@ -376,7 +447,7 @@ def main():
     intervals = [int(x) for x in args.intervals.split(",") if x.strip()]
     fold_ids = sorted(fronts["fold_id"].unique().tolist())
 
-    # --- Resume (checkpoint) ---
+    # Resume (checkpoint)
     completed = set()
     if result_csv.exists():
         try:
@@ -387,65 +458,85 @@ def main():
         except Exception as e:
             logging.warning(f"[RESUME] Could not read existing results ({e}).")
 
-    rows = []
-    for fid in fold_ids:
-        if fid not in champ_map:
-            logging.warning(f"[WARN] Tier-1 champion not found for fold {fid}; skipping.")
-            continue
-        champion = champ_map[fid]
+    rows: List[Dict] = []
+    total_tasks = sum(
+        1
+        for fid in fold_ids
+        if fid in champ_map
+        for interval in intervals
+        for src in ("GA_knee", "GA+BO_knee")
+        if (fid, interval, src) not in completed
+    )
 
-        for interval in intervals:
-            for src in ("GA_knee", "GA+BO_knee"):
-                if (fid, interval, src) in completed:
-                    if args.debug:
-                        logging.debug(f"[SKIP] Done: fold={fid}, int={interval}, src={src}")
-                    continue
+    with tqdm(total=total_tasks, desc="Backtesting", unit="run") as pbar:
+        for fid in fold_ids:
+            if fid not in champ_map:
+                logging.warning(f"[WARN] Tier-1 champion not found for fold {fid}; skipping.")
+                continue
+            champion = champ_map[fid]
 
-                pick = pick_knee_from_front(fronts, fid, interval, "GA" if src=="GA_knee" else "GA+BO")
-                if pick is None:
-                    if args.debug:
-                        logging.debug(f"[MISS] Knee not found for fold={fid}, int={interval}, src={src}")
-                    continue
+            for interval in intervals:
+                for src in ("GA_knee", "GA+BO_knee"):
+                    if (fid, interval, src) in completed:
+                        if args.debug:
+                            logging.debug(f"[SKIP] Done: fold={fid}, int={interval}, src={src}")
+                        continue
 
-                metrics = backtest_lstm(
-                    test_df=test_df,
-                    feature_cols=PC_FEATURES,
-                    champion=champion,
-                    t2_vars=pick,
-                    retrain_interval=interval,
-                    cost_per_turnover=args.cost_per_turnover,
-                    min_block_vol=args.min_block_vol,
-                    hysteresis=args.hysteresis,
-                    mad_k=args.mad_k,
-                    warmup_len=args.warmup_len,
-                    debug=args.debug
-                )
+                    pick = pick_knee_from_front(fronts, fid, interval, "GA" if src=="GA_knee" else "GA+BO")
+                    if pick is None:
+                        if args.debug:
+                            logging.debug(f"[MISS] Knee not found for fold={fid}, int={interval}, src={src}")
+                        pbar.update(1)
+                        continue
 
-                row = {
-                    "fold_id": int(fid),
-                    "retrain_interval": int(interval),
-                    "source": src,
-                    "window": int(pick["window"]),
-                    "units": int(pick["units"]),
-                    "learning_rate": float(pick["lr"]),
-                    "epochs": int(pick["epochs"]),
-                    "threshold": float(pick["threshold"]),
-                    "val_sharpe_front": float(pick["sharpe"]),
-                    "val_mdd_front": float(pick["mdd"]),
-                    "test_sharpe": float(metrics["sharpe"]),
-                    "test_mdd": float(metrics["mdd"]),
-                    "test_ann_return": float(metrics["ann_return"]),
-                    "test_ann_vol": float(metrics["ann_vol"]),
-                    "test_turnover": float(metrics["turnover"]),
-                    "test_n_points": int(metrics["n_points"])
-                }
-                rows.append(row)
+                    metrics = backtest_lstm(
+                        test_df=test_df,
+                        feature_cols=PC_FEATURES,
+                        champion=champion,
+                        t2_vars=pick,
+                        retrain_interval=interval,
+                        cost_per_turnover=args.cost_per_turnover,
+                        min_block_vol=args.min_block_vol,
+                        hysteresis=args.hysteresis,
+                        mad_k=args.mad_k,
+                        warmup_len=args.warmup_len,
+                        min_holding_days=args.min_holding_days,
+                        enter_k=args.enter_k,
+                        exit_k=args.exit_k,
+                        turnover_cap_per_year=args.turnover_cap_per_year,
+                        debug=args.debug
+                    )
 
-                # append immediately (checkpoint)
-                df1 = pd.DataFrame([row])
-                header = (not result_csv.exists()) or os.path.getsize(result_csv) == 0
-                df1.to_csv(result_csv, mode="a", index=False, header=header)
-                completed.add((fid, interval, src))
+                    row = {
+                        "fold_id": int(fid),
+                        "retrain_interval": int(interval),
+                        "source": src,
+                        "window": int(pick["window"]),
+                        "units": int(pick["units"]),
+                        "learning_rate": float(pick["lr"]),
+                        "epochs": int(pick["epochs"]),
+                        "threshold": float(pick["threshold"]),
+                        "val_sharpe_front": float(pick["sharpe"]),
+                        "val_mdd_front": float(pick["mdd"]),
+                        "test_sharpe": float(metrics["sharpe"]),
+                        "test_mdd": float(metrics["mdd"]),
+                        "test_ann_return": float(metrics["ann_return"]),
+                        "test_ann_vol": float(metrics["ann_vol"]),
+                        "test_turnover": float(metrics["turnover"]),
+                        "test_n_points": int(metrics["n_points"])
+                    }
+                    rows.append(row)
+
+                    # checkpoint append
+                    df1 = pd.DataFrame([row])
+                    header = (not result_csv.exists()) or os.path.getsize(result_csv) == 0
+                    df1.to_csv(result_csv, mode="a", index=False, header=header)
+                    completed.add((fid, interval, src))
+
+                    logging.info(f"[fold={fid} | int={interval} | {src}] "
+                                 f"SR={metrics['sharpe']:.2f} MDD={metrics['mdd']:.3f} "
+                                 f"AnnRet={metrics['ann_return']:.3f} Turnover={metrics['turnover']:.1f}")
+                    pbar.update(1)
 
     # Final tidy table
     if rows or result_csv.exists():
@@ -459,7 +550,7 @@ def main():
         df_all.to_csv(result_csv, index=False)
         logging.info(f"[OK] Saved backtest table -> {result_csv}")
 
-        # quick summary by interval & source
+        # summary
         summary = (df_all.groupby(["retrain_interval","source"], as_index=False)
                    .agg(test_sharpe_median=("test_sharpe","median"),
                         test_mdd_median=("test_mdd","median"),
@@ -469,6 +560,23 @@ def main():
         summary_csv = outdir / "backtest_lstm_summary_by_interval.csv"
         summary.to_csv(summary_csv, index=False)
         logging.info(f"[OK] Saved summary -> {summary_csv}")
+
+        # final interval choice (optional HV)
+        hv_df = None
+        if args.hv_csv:
+            try:
+                hv_df = pd.read_csv(args.hv_csv)
+            except FileNotFoundError:
+                logging.warning(f"[WARN] HV CSV not found: {args.hv_csv}")
+
+        best_interval, diag = choose_final_interval(hv_df, df_all, intervals)
+        choice_json = outdir / "final_interval_choice.json"
+        with open(choice_json, "w") as f:
+            json.dump({"best_interval": best_interval, "diagnostics": diag}, f, indent=2)
+        logging.info(f"[OK] Final interval = {best_interval} (details -> {choice_json})")
+        print(f"Final choice  : interval={best_interval}")
+        if "rule_used" in diag:
+            print(f"Decision rule : {diag['rule_used']}")
 
     print("\n=== LSTM Backtest complete ===")
     print(f"Results table : {result_csv}")

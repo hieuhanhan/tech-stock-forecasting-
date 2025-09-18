@@ -1,0 +1,12 @@
+{
+  "fold_id": 216,
+  "interval": 10,
+  "params": {
+    "window": 20,
+    "units": 36,
+    "lr": 0.002,
+    "epochs": 20,
+    "threshold": 0.5
+  },
+  "cumulative_return": 0.5157293717028926
+}

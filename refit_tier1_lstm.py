@@ -209,8 +209,8 @@ def main():
 
     rec = idx[args.fold_id]
     # Tên key phổ biến trong manifest; tuỳ bạn đổi cho khớp real manifest
-    train_key = rec.get("train_path_lstm") or rec.get("train_path") or rec.get("final_train_path")
-    val_key   = rec.get("val_path_lstm")   or rec.get("val_path")
+    train_key = rec.get("final_train_path") or rec.get("train_path") or rec.get("final_train_path")
+    val_key   = rec.get("final_val_path")   or rec.get("val_path")
 
     if train_key is None or val_key is None:
         raise SystemExit("Manifest must contain train and val CSV paths (e.g., 'train_path_lstm' and 'val_path_lstm').")

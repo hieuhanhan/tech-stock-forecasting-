@@ -3,14 +3,8 @@
 baseline_rs_lstm_tier2.py
 Random-Search baseline for LSTM Tier-2 (multi-objective: minimize [-Sharpe, MDD])
 
-Inputs (no re-training of Tier-1/2 is required):
-- Tier-1 champions JSON (per fold: layers, batch_size, dropout[, patience])
-- Fold paths JSON for LSTM (train/val CSVs with PC1..PC7, target, target_log_returns/Log_Returns)
-
-Outputs:
-- CSV with all RS evaluations
-- CSV with Pareto fronts per (fold, retraining interval)
-- CSV with knee pick per (fold, retraining interval)
+- Auto-derives `target` and `target_log_returns` from `Log_Returns` if missing
+- Detects PCA columns as PC1..PC7 (only those present)
 
 Usage (example):
 python baseline_rs_lstm_tier2.py \
@@ -18,25 +12,19 @@ python baseline_rs_lstm_tier2.py \
   --tier1-json data/tuning_results/jsons/tier1_lstm_backbone.json \
   --intervals 10,20,42 \
   --n-samples 120 \
-  --out-prefix results/baselines/rs_lstm/rs_lstm
-
-Notes:
-- Uses the same objective as your Tier-2 (signals = 0/1 with percentile threshold + hysteresis + MAD guard).
-- Safe defaults match your prior bounds; override via CLI if needed.
+  --skip-existing \
+  --out-prefix results/baselines/rs_lstm
 """
 
-import os, json, math, argparse, logging
+import os, json, argparse, logging
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Any, Tuple
 
 import numpy as np
 import pandas as pd
 
 # ---------- Import your Tier-2 LSTM objective ----------
-# Make sure lstm_utils_new.py is importable (same folder or in PYTHONPATH)
-from lstm_utils_new import (
-    create_periodic_lstm_objective,        # builds the Tier-2 objective (Sharpe/MDD)
-)
+from lstm_utils import create_periodic_lstm_objective  # builds the Tier-2 objective (Sharpe/MDD)
 
 # ---------- Small helpers (Pareto & knee) ----------
 def is_nondominated(F: np.ndarray) -> np.ndarray:
@@ -66,7 +54,7 @@ def load_json_any(p: Path):
     with p.open("r") as f:
         return json.load(f)
 
-def normalize_t1_records(rec) -> Dict:
+def normalize_t1_records(rec) -> Dict[str, Any]:
     """Extract LSTM Tier-1 champion fields robustly."""
     ch = rec.get("champion") or rec.get("best_params") or {}
     return dict(
@@ -86,7 +74,6 @@ def unwrap_folds(obj) -> List[dict]:
         return obj
     raise ValueError("Unexpected folds JSON structure.")
 
-# ---------- CLI ----------
 def get_args():
     ap = argparse.ArgumentParser("Random Search baseline — LSTM Tier-2")
     ap.add_argument("--folds-json", required=True,
@@ -97,6 +84,8 @@ def get_args():
                     help="Comma-separated retraining intervals.")
     ap.add_argument("--n-samples", type=int, default=120,
                     help="Random samples per (fold × interval).")
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="Skip (fold, interval) pairs that already have >= n-samples in results CSV.")
     ap.add_argument("--cost-per-turnover", type=float, default=0.0005 + 0.0002)
     ap.add_argument("--min-block-vol", type=float, default=0.0015)
     ap.add_argument("--hysteresis", type=float, default=0.05)
@@ -118,9 +107,68 @@ def get_args():
                     help="Realized returns column in VAL CSV ('target_log_returns' or 'Log_Returns').")
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--debug", action="store_true")
-    ap.add_argument("--out-prefix", default="results/baselines/rs_lstm/rs_lstm",
+    ap.add_argument("--out-prefix", default="results/baselines/rs_lstm",
                     help="Output prefix for CSVs (results/front/knee).")
     return ap.parse_args()
+
+def ensure_targets(df: pd.DataFrame, metric_col: str) -> pd.DataFrame:
+    """
+    Ensure df has:
+      - 'target' (next-step target for supervised training)
+      - 'target_log_returns' (realized PnL series; default metric_col)
+    If missing and 'Log_Returns' exists, build as shift(-1).
+    Drops last row if shift creates NaN.
+    """
+    df = df.copy()
+    # Build target if missing
+    if "target" not in df.columns:
+        if "Log_Returns" in df.columns:
+            df["target"] = df["Log_Returns"].shift(-1)
+        elif "target_log_returns" in df.columns:
+            df["target"] = df["target_log_returns"]
+        else:
+            raise ValueError("Missing both 'target' and 'Log_Returns' to create target.")
+    # Build target_log_returns if chosen metric is target_log_returns
+    if metric_col == "target_log_returns" and "target_log_returns" not in df.columns:
+        if "Log_Returns" in df.columns:
+            df["target_log_returns"] = df["Log_Returns"].shift(-1)
+        elif "target" in df.columns:
+            df["target_log_returns"] = df["target"]
+        else:
+            raise ValueError("Cannot construct 'target_log_returns' without 'Log_Returns' or 'target'.")
+    # Clean tail NaNs from shifting
+    if df["target"].isna().any():
+        df = df.dropna(subset=["target"]).reset_index(drop=True)
+    if metric_col in df.columns and df[metric_col].isna().any():
+        df = df.dropna(subset=[metric_col]).reset_index(drop=True)
+    return df
+
+def pick_pcs(cols: List[str]) -> List[str]:
+    """Return existing PCA columns among PC1..PC7, in order."""
+    return [f"PC{i}" for i in range(1, 8) if f"PC{i}" in cols]
+
+def _load_progress(res_csv: Path) -> Dict[Tuple[int, int], int]:
+    """
+    Return dict: (fold_id, retrain_interval) -> max iter completed (count of rows).
+    If 'iter' column exists, use max(iter); else use count of rows for the pair.
+    """
+    progress: Dict[Tuple[int, int], int] = {}
+    if not res_csv.exists() or os.path.getsize(res_csv) == 0:
+        return progress
+    try:
+        dfp = pd.read_csv(res_csv, usecols=["fold_id", "retrain_interval", "iter"])
+    except Exception:
+        # fallback if iter column missing
+        dfp = pd.read_csv(res_csv, usecols=["fold_id", "retrain_interval"])
+        dfp["iter"] = 1
+    grp = dfp.groupby(["fold_id", "retrain_interval"])
+    for (fid, itv), g in grp:
+        # robust: prefer max(iter) if present; else count
+        if "iter" in g.columns and pd.api.types.is_numeric_dtype(g["iter"]):
+            progress[(int(fid), int(itv))] = int(g["iter"].max())
+        else:
+            progress[(int(fid), int(itv))] = int(len(g))
+    return progress
 
 def main():
     args = get_args()
@@ -138,8 +186,8 @@ def main():
     folds_df = pd.DataFrame([{
         "fold_id": int(rec.get("global_fold_id", rec.get("fold_id"))),
         "ticker": rec.get("ticker", "UNK"),
-        "train": rec.get("train_path_lstm", rec.get("train_path")),
-        "val":   rec.get("val_path_lstm", rec.get("val_path")),
+        "train": rec.get("final_train_path", rec.get("train_path")),
+        "val":   rec.get("final_val_path", rec.get("val_path")),
         "val_meta": rec.get("val_meta_path_lstm", rec.get("val_meta_path")),
     } for rec in folds_obj])
     if folds_df["fold_id"].isna().any():
@@ -165,26 +213,16 @@ def main():
     for p in (res_csv, front_csv, knee_csv):
         ensure_dir(p.parent)
 
-    # Resume support
-    done = set()
-    if res_csv.exists():
-        try:
-            prev = pd.read_csv(res_csv)
-            for _, r in prev.iterrows():
-                done.add((int(r["fold_id"]), int(r["retrain_interval"])))
-            logging.info(f"[RESUME] Found {len(prev)} rows; {len(done)} pairs already started.")
-        except Exception:
-            logging.warning("[RESUME] Could not read previous results; continuing fresh.")
-
-    # Iterate folds
-    rows_all: List[Dict] = []
-    front_rows: List[Dict] = []
-    knee_rows: List[Dict] = []
+    # Progress / resume map: (fold_id, interval) -> max_iter_done
+    progress = _load_progress(res_csv)
+    if progress:
+        logging.info(f"[RESUME] Loaded progress for {len(progress)} (fold,interval) pairs.")
 
     # Base dir to resolve relative CSV paths
     folds_json_path = Path(args.folds_json).resolve()
     base_dir = folds_json_path.parents[2] if len(folds_json_path.parents) >= 2 else folds_json_path.parent
 
+    # Iterate folds
     for _, rec in folds_df.iterrows():
         fid   = int(rec["fold_id"])
         tick  = str(rec["ticker"])
@@ -210,17 +248,45 @@ def main():
             logging.warning(f"[SKIP] Read error fold {fid}: {e}")
             continue
 
-        # Features (expect PC1..PC7 and target)
-        pcs = [f"PC{i}" for i in range(1, 8)]
+        # Ensure targets from Log_Returns if needed
+        try:
+            df_tr = ensure_targets(df_tr, metric_col=args.metric_col)
+            df_va = ensure_targets(df_va, metric_col=args.metric_col)
+        except Exception as e:
+            logging.warning(f"[SKIP] Target creation failed for fold {fid}: {e}")
+            continue
+
+        # Pick PCA columns PC1..PC7 (only those present)
+        pcs_tr = pick_pcs(df_tr.columns.tolist())
+        pcs_va = pick_pcs(df_va.columns.tolist())
+        pcs = [c for c in pcs_tr if c in pcs_va]  # intersection, keep order
+        if len(pcs) == 0:
+            logging.warning(f"[SKIP] No PCA columns PC1..PC7 found in fold {fid}")
+            continue
+
+        # Final column check
         needed_tr = pcs + ["target"]
         needed_va = pcs + ["target", args.metric_col]
         if any(c not in df_tr.columns for c in needed_tr) or any(c not in df_va.columns for c in needed_va):
             logging.warning(f"[SKIP] Missing required columns in fold {fid}")
             continue
 
+        # Drop residual NaNs in the needed columns
+        df_tr = df_tr.dropna(subset=needed_tr).reset_index(drop=True)
+        df_va = df_va.dropna(subset=needed_va).reset_index(drop=True)
+        if len(df_tr) == 0 or len(df_va) == 0:
+            logging.warning(f"[SKIP] Empty after NaN drop in fold {fid}")
+            continue
+
         champion = champs[fid]
 
         for interval in intervals:
+            key = (fid, int(interval))
+            already = int(progress.get(key, 0))
+            if args.skip_existing and already >= int(args.n_samples):
+                logging.info(f"[SKIP-EXISTING] fold={fid} int={interval} already has {already} >= n_samples={args.n_samples}")
+                continue
+
             # Build Tier-2 objective (same as GA/BO)
             obj = create_periodic_lstm_objective(
                 train_df=df_tr,
@@ -236,9 +302,13 @@ def main():
 
             rng = np.random.default_rng(args.seed + fid + interval)
 
-            # Random sampling loop
-            eval_rows: List[Dict] = []
-            for it in range(1, int(args.n_samples) + 1):
+            # Resume from next iteration
+            start_iter = already + 1
+            if start_iter > int(args.n_samples):
+                start_iter = int(args.n_samples)  # just in case
+
+            eval_rows: List[Dict[str, Any]] = []
+            for it in range(start_iter, int(args.n_samples) + 1):
                 w   = int(rng.integers(args.w_min, args.w_max + 1))
                 u   = int(rng.integers(args.u_min, args.u_max + 1))
                 ep  = int(rng.integers(args.ep_min, args.ep_max + 1))
@@ -270,23 +340,26 @@ def main():
                 }
                 eval_rows.append(row)
 
-                # checkpoint append
+                # checkpoint append (per-iter)
                 df1 = pd.DataFrame([row])
                 header = (not res_csv.exists()) or os.path.getsize(res_csv) == 0
                 df1.to_csv(res_csv, mode="a", index=False, header=header)
 
-            # Pareto front from RS evaluations (on displayed Sharpe/MDD)
+            # If we resumed and no new rows were produced, still rebuild front/knee from existing rows?
+            # Here, we only compute front/knee from 'eval_rows' produced this run.
+            # To be safe, if eval_rows is empty but already >= n_samples, we skip silently (skip-existing covers this).
             if not eval_rows:
+                logging.info(f"[RESUME] fold={fid} int={interval} had no new iters to run.")
                 continue
+
+            # Pareto front from *this-run* RS evaluations
             df_eval = pd.DataFrame(eval_rows)
-            # Build F = [-Sharpe, MDD] (min)
             F = np.c_[ -df_eval["sharpe"].astype(float).to_numpy(),
                         df_eval["mdd"].astype(float).to_numpy() ]
             nd = is_nondominated(F)
             df_front = df_eval.loc[nd].copy()
-            df_front["front_type"] = "RS"  # to match your GA/GA+BO naming
+            df_front["front_type"] = "RS"
 
-            # append to front CSV
             header = (not front_csv.exists()) or os.path.getsize(front_csv) == 0
             df_front.to_csv(front_csv, mode="a", index=False, header=header)
 
@@ -300,7 +373,7 @@ def main():
                 header = (not knee_csv.exists()) or os.path.getsize(knee_csv) == 0
                 pd.DataFrame([knee]).to_csv(knee_csv, mode="a", index=False, header=header)
 
-            logging.info(f"[Fold {fid} | int={interval}] RS evals={len(df_eval)} | front={df_front.shape[0]}")
+            logging.info(f"[Fold {fid} | int={interval}] RS new_evals={len(df_eval)} | front_added={df_front.shape[0]}")
 
     print("\n=== Random Search baseline (LSTM Tier-2) — DONE ===")
     print(f"All evals : {res_csv}")

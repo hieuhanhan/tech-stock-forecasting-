@@ -1,0 +1,11 @@
+{
+  "fold_id": 343,
+  "interval": 42,
+  "source": "GA+BO_knee",
+  "params": {
+    "p": 2,
+    "q": 2,
+    "threshold": 0.5999978695741284
+  },
+  "cumulative_return": 0.7061259889658267
+}

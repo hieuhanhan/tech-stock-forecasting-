@@ -4,8 +4,8 @@ import numpy as np
 from pathlib import Path
 
 # -------- paths --------
-HV_CSV  = Path("data/tuning_results/csv/tier2_arima_cont_gabo_hv.csv")
-OUT_PNG = Path("results/chap5/Fig_5_3_HV_progression_arima_markers.png")
+HV_CSV  = Path("data/tuning_results/csv/tier2_arima.csv")
+OUT_PNG = Path("results/chap5/Fig_5_3_HV_progression_lstm_markers.png")
 OUT_PNG.parent.mkdir(parents=True, exist_ok=True)
 
 # -------- style --------
@@ -48,7 +48,7 @@ ax.set_ylim(ymin - pad, ymax + pad)
 
 ax.set_xlabel("Generation")
 ax.set_ylabel("Hypervolume (HV)")
-ax.set_title("Hypervolume (HV) progression across generations — Tier-2 ARIMA (mean ± std)",
+ax.set_title("Hypervolume (HV) progression across generations — Tier-2 LSTM (mean ± std)",
              fontsize=12, pad=8)
 ax.grid(True, linestyle=":", linewidth=0.6, alpha=0.6)
 

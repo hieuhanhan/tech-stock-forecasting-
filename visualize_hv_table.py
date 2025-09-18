@@ -5,13 +5,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ---------------- paths ----------------
-HV_CSV   = Path("data/tuning_results/csv/tier2_arima_cont_gabo_hv.csv")
+HV_CSV   = Path("data/tuning_results/csv/tier2_lstm_hv.csv")
 OUT_DIR  = Path("results/chap5/hv_filtered"); OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-CSV_IMPROVED = OUT_DIR / "Table_5_3_hv_improved_only.csv"
-CSV_SUMMARY  = OUT_DIR / "Table_5_3_hv_improvement_summary_by_interval.csv"
-PNG_IMPROVED = OUT_DIR / "Fig_5_3_hv_improved_only.png"
-PNG_SUMMARY  = OUT_DIR / "Fig_5_3_hv_improvement_summary.png"
+CSV_IMPROVED = OUT_DIR / "Table_5_3_hv_improved_only_lstm.csv"
+CSV_SUMMARY  = OUT_DIR / "Table_5_3_hv_improvement_summary_by_interval_lstm.csv"
+PNG_IMPROVED = OUT_DIR / "Fig_5_3_hv_improved_only_lstm.png"
+PNG_SUMMARY  = OUT_DIR / "Fig_5_3_hv_improvement_summary_lstm.png"
 
 # ---------------- style ----------------
 plt.rcParams["font.family"] = "Times New Roman"

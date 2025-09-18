@@ -1,0 +1,13 @@
+Ticker,Series,ADF_stat,ADF_p,KPSS_stat,KPSS_p,N_obs
+AAPL,Log Price (level),-0.0777,0.9516,7.8382,0.01,2753
+AAPL,Log Return (diff),-14.1633,0.0,0.1242,0.1,2754
+MSFT,Log Price (level),1.4837,0.9975,8.2948,0.01,2758
+MSFT,Log Return (diff),-21.2269,0.0,0.4148,0.0708,2759
+AMZN,Log Price (level),0.0713,0.964,8.6021,0.01,2763
+AMZN,Log Return (diff),-31.2477,0.0,0.0641,0.1,2764
+GOOGL,Log Price (level),-0.1985,0.9387,8.6256,0.01,2765
+GOOGL,Log Return (diff),-47.6557,0.0,0.0672,0.1,2766
+META,Log Price (level),-1.0211,0.7455,6.731,0.01,2166
+META,Log Return (diff),-44.0072,0.0,0.0584,0.1,2167
+TSLA,Log Price (level),0.3919,0.9812,6.9787,0.01,2643
+TSLA,Log Return (diff),-48.1039,0.0,0.2086,0.1,2644
