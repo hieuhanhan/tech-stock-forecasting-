@@ -106,7 +106,6 @@ def load_best_and_knee(fronts_path: str, knee_path: str) -> pd.DataFrame:
     use_cols = ["fold_id","retrain_interval","source","sharpe","mdd","kind"]
     both = pd.concat([best[use_cols], knee[use_cols]], ignore_index=True)
 
-    # If your knee file only contains GA+BO (or only GA), that’s fine—the plot will reflect it.
     return both
 
 # ---------------------------------------
