@@ -25,7 +25,7 @@ Backtesting utilizes walk-forward validation (2010–2020) with retraining inter
  
 🛠️ Requirements
 
-	•	Python 3.11
+	•	Python 3.12
  
 	•	PySpark, Pandas, NumPy
  
