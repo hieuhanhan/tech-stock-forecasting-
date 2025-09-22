@@ -8,7 +8,7 @@ OUT_PNG2.parent.mkdir(parents=True, exist_ok=True)
 
 hv = pd.read_csv("data/tuning_results/csv/tier2_arima_cont_gabo_hv.csv")
 
-# take only the final rows we care about
+
 df_final = hv[hv["stage"].isin(["final_ga", "final_union"])].copy()
 df_final = df_final[np.isfinite(df_final["hv"])]
 df_final["stage_clean"] = df_final["stage"].map({"final_ga": "GA", "final_union": "GA+BO"})
