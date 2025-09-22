@@ -1,5 +1,3 @@
-Hybrid Optimization for Financial Time-Series Forecasting
-
 This repository contains the code, data processing pipeline, and experimental results for my project.
 
 The study develops a two-tier optimization framework that integrates Genetic Algorithms (GA), Bayesian Optimization (BO), and NSGA-II for forecasting and trading strategy design on U.S. technology stocks (the “Magnificent Seven”).
