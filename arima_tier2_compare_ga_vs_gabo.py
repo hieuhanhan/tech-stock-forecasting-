@@ -118,7 +118,7 @@ def run_sensitivity(test_log: np.ndarray, p:int,q:int,thr:float, interval:int,
             tr = backtest_continuous_trace(
                 test_log, p,q, thr*tm, interval, cost*cm, **kwargs
             )
-            # Sharpe từ ret_simple; MDD từ log-cum
+
             eq = np.exp(np.cumsum(tr["ret_log"]))
             peak = np.maximum.accumulate(eq); dd = (peak-eq)/(peak+EPS)
             S[i,j] = sharpe_ratio(tr["ret_simple"])
@@ -166,7 +166,6 @@ def main():
     test = pd.read_csv(args.test_csv)
     x = test["Log_Returns"].fillna(0).to_numpy(float)
 
-    # chọn các cặp có cả GA_knee và GA+BO_knee
     ints = [int(s) for s in args.intervals.split(",") if s.strip()]
     pairs = []
     for fid, interval in bt.groupby(["fold_id", "retrain_interval"]).groups.keys():
@@ -177,7 +176,7 @@ def main():
             row_bo  = sub[sub.source=="GA+BO_knee"].iloc[0]
             delta_s = abs(float(row_bo["test_sharpe"]) - float(row_ga["test_sharpe"]))
             delta_m = abs(float(row_bo["test_mdd"])    - float(row_ga["test_mdd"]))
-            # khác nếu p/q/thr khác hoặc metric khác
+
             diff = (row_ga["p"]!=row_bo["p"]) or (row_ga["q"]!=row_bo["q"]) or (float(row_ga["threshold"])!=float(row_bo["threshold"])) \
                    or (delta_s>1e-6) or (delta_m>1e-6)
             if diff:
@@ -186,7 +185,6 @@ def main():
         print("[INFO] No differing pairs found.")
         return
 
-    # lấy 3 cặp có |ΔSharpe| lớn nhất
     pairs = sorted(pairs, key=lambda t: (t[2], t[3]), reverse=True)[:3] # MDD: pairs = sorted(pairs, key=lambda t: (t[3], t[2]), reverse=True)[:3]
     print("[SELECTED 3] ", pairs)
 
