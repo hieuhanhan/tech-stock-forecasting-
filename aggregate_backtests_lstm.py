@@ -1,24 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Aggregate Tier-2 LSTM backtests → Figures + Tables
-
-Inputs
-------
-- --backtest-csv : CSV kết quả backtest LSTM (per fold × interval × source)
-- --test-csv     : TEST set CSV chứa PC1..PC7, target, target_log_returns (hoặc Log_Returns)
-- --tier1-json   : JSON champions Tier-1 (list hoặc {"results":[...]}), mỗi fold có {layers,batch_size,dropout,patience}
-
-Outputs (under --outdir)
-------------------------
-- box_test_sharpe_by_interval(_source).png
-- box_test_mdd_by_interval(_source).png
-- box_test_ann_return_by_interval(_source).png
-- mean_equity/mean_equity_int{K}_{SRC}.png           (nếu không tắt)
-- aggregate_summary.csv
-"""
-
 import os
 import json
 import argparse
