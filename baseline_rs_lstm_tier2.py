@@ -5,7 +5,6 @@ from typing import Dict, List, Any, Tuple
 import numpy as np
 import pandas as pd
 
-# ---------- Import your Tier-2 LSTM objective ----------
 from lstm_utils import create_periodic_lstm_objective  # builds the Tier-2 objective (Sharpe/MDD)
 
 # ---------- Small helpers (Pareto & knee) ----------
