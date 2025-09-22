@@ -6,6 +6,7 @@ The study develops a two-tier optimization framework that integrates Genetic Alg
 
 The project evaluates two model families:
 	•	ARIMA–GARCH: a stable, interpretable econometric benchmark with strong downside risk control.
+ 
 	•	LSTM: a deep learning alternative that captures nonlinear dependencies but is more volatile.
 
 A hybrid optimization pipeline is proposed:
