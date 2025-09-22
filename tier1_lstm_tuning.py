@@ -15,7 +15,7 @@ from pymoo.algorithms.soo.nonconvex.ga import GA
 
 from skopt.space import Integer, Real, Space
 from skopt import gp_minimize
-from skopt.utils import check_x_in_space  # <-- use this instead of Space.contains
+from skopt.utils import check_x_in_space  # 
 
 # ---- Import your utils (new strategy) ----
 from lstm_utils import (
