@@ -1,0 +1,18 @@
+{
+  "model_type": "arima",
+  "scaler": {
+    "type": "standard"
+  },
+  "feature_cols": [
+    "Log_Returns"
+  ],
+  "pca": {
+    "skipped": true,
+    "n_components_param": null,
+    "reduced_dim": 1,
+    "explained_variance_ratio": null,
+    "cumulative_variance": null
+  },
+  "fitted_on": "union_train_of_selected_folds",
+  "num_selected_folds": 11
+}
