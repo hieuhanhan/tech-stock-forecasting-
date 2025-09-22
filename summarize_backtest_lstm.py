@@ -33,7 +33,7 @@ def main():
     if df.empty:
         raise SystemExit("No rows after filtering. Check --intervals / --sources.")
 
-    # group by source only (to match your ARIMA table)
+    # group by source only 
     grp = (df.groupby("source", as_index=False)
              .agg(Sharpe_mean=("test_sharpe","mean"),
                   Sharpe_median=("test_sharpe","median"),
@@ -66,12 +66,7 @@ def main():
 
     disp.to_csv(out_csv, index=False)
 
-    # simple LaTeX tabular (can paste into your table template)
-    tex = disp.to_latex(index=False, escape=False, float_format=lambda x: f"{x:.{r}f}")
-    out_tex.write_text(tex, encoding="utf-8")
-
     print(f"[OK] Saved summary CSV -> {out_csv}")
-    print(f"[OK] Saved LaTeX table -> {out_tex}")
     print("\nPreview:\n", disp.to_string(index=False))
 
 if __name__ == "__main__":
