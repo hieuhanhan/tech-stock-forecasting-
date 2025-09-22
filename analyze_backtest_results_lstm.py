@@ -1,30 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Tier-2 LSTM tools (viz / sensitivity / cumret / vol / turnover)
-- Tham số lấy từ *_front.csv (knee GA/GA+BO) hoặc từ backtest CSV (đã pick)
-- TEST CSV yêu cầu: PC1..PC7, 'target', và 'target_log_returns' (hoặc 'Log_Returns')
-
-Ví dụ:
-  python lstm_tier2_tools.py viz \
-    --test-csv lstm/test/test_fold_553.csv \
-    --interval 20 \
-    --fold-id 553 \
-    --front-csv results/tier2_lstm_front.csv --front-type GA+BO
-
-  python lstm_tier2_tools.py sensitivity \
-    --test-csv lstm/test/test_fold_553.csv \
-    --interval 20 --fold-id 553 \
-    --front-csv results/tier2_lstm_front.csv --front-type GA+BO \
-    --cost-mults 0.5,1.0,1.5 --thr-mults 0.9,1.0,1.1 --plot
-
-  python lstm_tier2_tools.py cumret \
-    --test-csv lstm/test/test_fold_553.csv \
-    --interval 20 --fold-id 553 \
-    --backtest-csv data/backtest_lstm/backtest_lstm_results.csv --source-label GA+BO_knee \
-    --write-csv
-"""
-
 import argparse
 import json
 import logging
@@ -152,7 +125,7 @@ def pick_knee_from_front(front_df: pd.DataFrame, fold_id: int, interval: int, fr
         return None
     lr_key = "learning_rate" if "learning_rate" in sub.columns else ("lr" if "lr" in sub.columns else None)
     if lr_key is None: return None
-    # chọn điểm gần gốc trong không gian (−Sharpe, MDD)
+
     F = np.c_[ -sub["sharpe"].to_numpy(float), sub["mdd"].to_numpy(float) ]
     f = (F - F.min(axis=0)) / (np.ptp(F, axis=0) + 1e-12)
     idx = int(np.argmin(np.sqrt((f**2).sum(axis=1))))
@@ -385,7 +358,6 @@ def cmd_viz(args):
         if c not in test.columns:
             raise ValueError(f"Test CSV must contain column '{c}'")
 
-    # Champion (tối thiểu cần layers/batch/dropout) — cho viz có thể dùng default
     champion = dict(layers=args.layers, batch_size=args.batch_size, dropout=args.dropout, patience=args.patience)
 
     # Run trace
