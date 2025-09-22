@@ -171,17 +171,15 @@ def compute_meta_features_for_fold(
     bear_ratio = float(vc.get("bear", 0.0))
     side_ratio = float(vc.get("sideways", 0.0))
 
-    # -------- Lấy nguồn VAL META cho ratio/vol của ARIMA --------
+
     dates = data_for_meta["Date"] if "Date" in data_for_meta.columns else None
     ticker = fold.get("ticker") or fold.get("Ticker")
 
     if config.model_type == "arima":
-        # Ưu tiên lấy từ val_meta CSV
         labels_val = val_meta_dataframe["target"] if (val_meta_dataframe is not None and "target" in val_meta_dataframe.columns) else None
         log_returns_val = val_meta_dataframe["Log_Returns"] if (val_meta_dataframe is not None and "Log_Returns" in val_meta_dataframe.columns) else None
         close_val = val_meta_dataframe["Close_raw"] if (val_meta_dataframe is not None and "Close_raw" in val_meta_dataframe.columns) else None
 
-        # Fallback sang val CSV nếu cần
         if labels_val is None and "target" in validation_dataframe.columns:
             labels_val = validation_dataframe["target"]
         if log_returns_val is None and "Log_Returns" in validation_dataframe.columns:
@@ -189,7 +187,6 @@ def compute_meta_features_for_fold(
         if close_val is None and "Close_raw" in validation_dataframe.columns:
             close_val = validation_dataframe["Close_raw"]
 
-        # Tính các chỉ số dựa trên VAL
         positive_ratio = float(pd.to_numeric(labels_val, errors="coerce").mean()) if labels_val is not None else 0.0
         volatility     = float(pd.to_numeric(log_returns_val, errors="coerce").std()) if log_returns_val is not None else 0.0
         downside_vol   = downside_volatility(log_returns_val) if log_returns_val is not None else 0.0
@@ -197,7 +194,6 @@ def compute_meta_features_for_fold(
         skewness, kurtosis = safe_skew_kurtosis(log_returns_val) if log_returns_val is not None else (0.0, 0.0)
         trend_strength = trend_strength_from_prices(close_val) if close_val is not None else 0.0
     else:
-        # LSTM: giữ nguyên nguồn data_for_meta
         labels = data_for_meta["target"] if "target" in data_for_meta.columns else None
         log_returns = data_for_meta["Log_Returns"] if "Log_Returns" in data_for_meta.columns else None
         close_prices = data_for_meta["Close_raw"] if "Close_raw" in data_for_meta.columns else None
@@ -209,7 +205,6 @@ def compute_meta_features_for_fold(
         skewness, kurtosis = safe_skew_kurtosis(log_returns) if log_returns is not None else (0.0, 0.0)
         trend_strength = trend_strength_from_prices(close_prices) if close_prices is not None else 0.0
 
-    # -------- Gói meta chung --------
     meta: Dict = {
         "global_fold_id": fold.get("global_fold_id"),
         "ticker": ticker,
@@ -223,7 +218,6 @@ def compute_meta_features_for_fold(
         "bull_ratio": bull_ratio,
         "bear_ratio": bear_ratio,
         "side_ratio": side_ratio,
-        # tương thích QC/selection cũ:
         "val_pos_ratio": positive_ratio,
         "val_vol": volatility,
     }
@@ -265,7 +259,6 @@ def compute_meta_features_for_fold(
                     "pc1_to_pc5_cumulative_share": 0.0,
                 })
     else:  # ARIMA
-        # ACF trên VAL log-returns nếu có; fallback rỗng
         selected_lags = [1, 5, 21]
         series_for_acf = (val_meta_dataframe["Log_Returns"]
                           if (val_meta_dataframe is not None and "Log_Returns" in val_meta_dataframe.columns)
