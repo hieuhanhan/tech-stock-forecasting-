@@ -118,14 +118,12 @@ def batch_render(csv_paths: list[str | Path], out_dir: str | Path | None = None,
         out_png = (out_dir / (c.stem + ".png")) if out_dir else c.with_suffix(".png")
         save_table_png(df, out_png, title=title)
 
-# ---------- Example usage ----------
-# 1) List your CSVs here (edit paths as needed)
 csv_list = [
-    # HV diagnostics (improved-only and summary)
+    # HV diagnostics
     "results/chap5/hv_filtered/Table_5_3_hv_improved_only.csv",
     "results/chap5/hv_filtered/Table_5_3_hv_improvement_summary_by_interval.csv",
 
-    # Backtest tables (ARIMA): replace with your actual paths
+    # Backtest tables
     "results/chap5/backtest_summaries/Table_backtest_overall_by_source.csv",
     "results/chap5/backtest_summaries/Table_backtest_by_interval_and_source.csv",
     "results/chap5/backtest_summaries/Table_backtest_by_ticker_and_source.csv",
@@ -142,5 +140,4 @@ csv_list = [
     "Table_backtest_by_ticker_and_source.csv": "Backtest by ticker × source",
 }"""
 
-# 3) Render all to PNGs (keeps the style shown in your screenshot)
 batch_render(csv_list, out_dir="results/chap5/tables_png") #title_map=pretty_titles)
